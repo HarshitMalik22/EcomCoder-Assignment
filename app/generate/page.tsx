@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Download, Code, Eye, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, Code, Eye, PanelLeftClose, PanelLeftOpen, RefreshCw } from 'lucide-react';
 import SectionSelector from '@/components/SectionSelector';
 import LivePreview from '@/components/LivePreview';
 import ChatInterface from '@/components/ChatInterface';
@@ -29,32 +29,79 @@ function GeneratePageContent() {
     const [previewMode, setPreviewMode] = useState<'generated' | 'original'>('generated');
     const { addToast } = useToast();
 
-    // 1. Detect Sections on Load
-    useEffect(() => {
+    // State Persistence
+    const STORAGE_KEY = `ecomcoder_gen_state_${url ? encodeURIComponent(url) : 'default'}`;
+
+    // 1. Detect Sections or Restore
+    const detectSections = useCallback(async (forceRefresh = false) => {
         if (!url) return;
 
-        const detect = async () => {
+        if (forceRefresh) {
+            sessionStorage.removeItem(STORAGE_KEY);
+            setStep('detecting'); // Explicitly set detecting to show loader
+        } else {
+            // Try to restore first
             try {
-                const res = await fetch('/api/detect-sections', {
-                    method: 'POST',
-                    body: JSON.stringify({ url }),
-                });
-                const data = await res.json();
-
-                if (!res.ok) throw new Error(data.error);
-
-                setSections(data.data.sections);
-                setFullPageScreenshot(data.data.fullPageScreenshot);
-                setStep('selecting');
-                addToast(`Found ${data.data.sections.length} sections`, 'success');
+                const saved = sessionStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const state = JSON.parse(saved);
+                    if (state.sections && state.sections.length > 0) {
+                        setSections(state.sections);
+                        setFullPageScreenshot(state.fullPageScreenshot);
+                        setStep(state.step);
+                        setSelectedIds(state.selectedIds || []);
+                        setGeneratedComponents(state.generatedComponents || []);
+                        setActiveComponentId(state.activeComponentId || null);
+                        addToast("Restored previous session", "info");
+                        return;
+                    }
+                }
             } catch (e) {
-                addToast((e as Error).message, 'error');
-                // Stay on detecting or show error
+                console.error("Failed to restore state", e);
             }
-        };
+        }
 
-        detect();
-    }, [url, addToast]);
+        try {
+            const res = await fetch('/api/detect-sections', {
+                method: 'POST',
+                body: JSON.stringify({ url }),
+            });
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error);
+
+            setSections(data.data.sections);
+            setFullPageScreenshot(data.data.fullPageScreenshot);
+            setStep('selecting');
+            addToast(`Found ${data.data.sections.length} sections`, 'success');
+        } catch (e) {
+            addToast((e as Error).message, 'error');
+        }
+    }, [url, addToast, STORAGE_KEY]);
+
+    // Initial load
+    useEffect(() => {
+        detectSections();
+    }, [detectSections]);
+
+    // Save state on change
+    useEffect(() => {
+        if (!url || sections.length === 0) return;
+
+        const state = {
+            step,
+            sections,
+            fullPageScreenshot,
+            selectedIds,
+            generatedComponents,
+            activeComponentId
+        };
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }, [url, step, sections, fullPageScreenshot, selectedIds, generatedComponents, activeComponentId, STORAGE_KEY]);
+
+    const [activeTab, setActiveTab] = useState<'code' | 'chat'>('code');
+
+    // ... (keep useEffect for detect)
 
     // 2. Generate Components
     const handleGenerate = async (ids: string[]) => {
@@ -62,8 +109,6 @@ function GeneratePageContent() {
         setStep('generating');
 
         try {
-            // Process sequentially to avoid rate limits? Or parallel.
-            // We'll do parallel for now.
             const promises = ids.map(async (id) => {
                 const section = sections.find(s => s.id === id);
                 if (!section) return null;
@@ -75,7 +120,12 @@ function GeneratePageContent() {
 
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error);
-                return data.data as GeneratedComponent;
+
+                // Initialize history with v1
+                const component = data.data as GeneratedComponent;
+                component.history = [{ timestamp: Date.now(), code: component.code, prompt: 'Initial Generation' }];
+
+                return component;
             });
 
             const results = (await Promise.all(promises)).filter(c => c !== null) as GeneratedComponent[];
@@ -113,9 +163,16 @@ function GeneratePageContent() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
 
-            // Update component
+            // Update component and history
+            const newCode = data.data.code;
+            const newHistoryItem = { timestamp: Date.now(), code: newCode, prompt: instruction };
+
             setGeneratedComponents(prev => prev.map(c =>
-                c.id === activeComponentId ? { ...c, code: data.data.code } : c
+                c.id === activeComponentId ? {
+                    ...c,
+                    code: newCode,
+                    history: [...(c.history || []), newHistoryItem]
+                } : c
             ));
 
             addToast("Component updated!", "success");
@@ -124,6 +181,14 @@ function GeneratePageContent() {
         } finally {
             setIsRefining(false);
         }
+    };
+
+    const handleRevert = (code: string) => {
+        if (!activeComponentId) return;
+        setGeneratedComponents(prev => prev.map(c =>
+            c.id === activeComponentId ? { ...c, code } : c
+        ));
+        addToast("Reverted to previous version", "info");
     };
 
     const handleBack = () => {
@@ -144,10 +209,10 @@ function GeneratePageContent() {
     const activeComponent = generatedComponents.find(c => c.id === activeComponentId);
 
     return (
-        <div className="min-h-screen bg-black text-white p-4 md:p-8" suppressHydrationWarning>
-            <div className="max-w-7xl mx-auto space-y-8" suppressHydrationWarning>
-                {/* Header */}
-                <div className="flex items-center justify-between" suppressHydrationWarning>
+        <div className="min-h-screen bg-black text-white p-4 md:p-6 overflow-hidden max-h-screen flex flex-col" suppressHydrationWarning>
+            {/* Header - Compact */}
+            <div className="flex items-center justify-between mb-4 shrink-0" suppressHydrationWarning>
+                <div className="flex items-center gap-4">
                     <button
                         onClick={handleBack}
                         className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
@@ -155,31 +220,48 @@ function GeneratePageContent() {
                         <ArrowLeft className="w-4 h-4" />
                         Back
                     </button>
-                    <h1 className="text-xl font-bold truncate max-w-md">{url}</h1>
-                    <div className="w-20"></div>
+                    {(step === 'selecting' || step === 'preview') && (
+                        <button
+                            onClick={() => detectSections(true)}
+                            className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-sm"
+                            title="Rescan Website"
+                        >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Rescan
+                        </button>
+                    )}
                 </div>
 
-                {/* LOADING STATE - DETECTING */}
+                <h1 className="text-lg font-bold truncate max-w-md opacity-80">{url}</h1>
+                <div className="w-20"></div>
+            </div>
+
+            {/* MAIN CONTENT AREA */}
+            <div className="flex-1 min-h-0 flex flex-col relative">
+
+                {/* STATE: DETECTING */}
                 {step === 'detecting' && (
-                    <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-700">
+                    <div className="flex flex-col items-center justify-center h-full animate-in fade-in duration-700">
                         <Loader2 className="w-12 h-12 text-violet-500 animate-spin mb-4" />
                         <h2 className="text-2xl font-semibold">Scanning Website...</h2>
                         <p className="text-zinc-500 mt-2">Analyzing structure, capturing screenshots, and identifying components.</p>
                     </div>
                 )}
 
-                {/* SELECT STATE */}
+                {/* STATE: SELECTING */}
                 {step === 'selecting' && (
-                    <SectionSelector
-                        sections={sections}
-                        onGenerate={handleGenerate}
-                        isGenerating={false}
-                    />
+                    <div className="h-full overflow-y-auto">
+                        <SectionSelector
+                            sections={sections}
+                            onGenerate={handleGenerate}
+                            isGenerating={false}
+                        />
+                    </div>
                 )}
 
-                {/* GENERATING STATE */}
+                {/* STATE: GENERATING */}
                 {step === 'generating' && (
-                    <div className="flex flex-col items-center justify-center py-20 animate-in fade-in duration-700">
+                    <div className="flex flex-col items-center justify-center h-full animate-in fade-in duration-700">
                         <div className="relative">
                             <div className="absolute inset-0 bg-violet-500 blur-xl opacity-20 animate-pulse"></div>
                             <Loader2 className="w-16 h-16 text-violet-500 animate-spin relative z-10" />
@@ -189,105 +271,129 @@ function GeneratePageContent() {
                     </div>
                 )}
 
-                {/* PREVIEW STATE */}
+                {/* STATE: PREVIEW */}
                 {step === 'preview' && activeComponent && (
-                    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-140px)] animate-in fade-in slide-in-from-bottom-8 duration-700">
+                    <div className="flex flex-col lg:flex-row gap-4 h-full">
 
-                        {/* LEFT COLUMN: Checkbox / Toggle for Code Panel */}
+                        {/* LEFT COLUMN: EDITOR & CHAT (Resizable/Toggleable) */}
                         <div
-                            className={`flex flex-col gap-4 transition-all duration-300 ease-in-out overflow-hidden ${isCodePanelOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 w-0 min-w-0'
-                                }`}
-                            style={{
-                                width: isCodePanelOpen ? '35%' : '0px',
-                                minWidth: isCodePanelOpen ? '350px' : '0px',
-                                display: 'flex'
-                            }}
+                            className={`flex flex-col gap-0 transition-all duration-300 ease-in-out bg-zinc-950 border border-zinc-900 rounded-xl overflow-hidden ${isCodePanelOpen ? 'w-[400px] xl:w-[450px]' : 'w-0 opacity-0 hidden'}`}
                         >
-                            <div className="flex items-center justify-between min-w-[350px]">
-                                <div className="flex items-center gap-2">
-                                    <Code className="w-5 h-5 text-zinc-400" />
-                                    <span className="font-semibold">Code</span>
-                                </div>
-                                <div className="flex gap-2">
-                                    <CopyButton text={activeComponent.code} />
-                                    <button
-                                        onClick={() => generateDownload(activeComponent.name, activeComponent.code)}
-                                        className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-all"
-                                        title="Download"
-                                    >
-                                        <Download className="w-4 h-4" />
-                                    </button>
-                                </div>
+                            {/* Tabs Header */}
+                            <div className="flex border-b border-white/5 bg-zinc-900/50">
+                                <button
+                                    onClick={() => setActiveTab('code')}
+                                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'code' ? 'border-violet-500 text-white bg-white/5' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    Code
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('chat')}
+                                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 flex items-center justify-center gap-2 ${activeTab === 'chat' ? 'border-violet-500 text-white bg-white/5' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    <span>Refine</span>
+                                </button>
                             </div>
 
-                            <div className="flex-1 overflow-hidden min-w-[350px]">
-                                <CodeDisplay key={activeComponent.code.length} code={activeComponent.code} />
-                            </div>
-                        </div>
-
-                        {/* RIGHT COLUMN: Preview (65%) */}
-                        <div className="flex-1 flex flex-col gap-4 min-w-0">
-                            {/* Header: Toggle & Tabs */}
-                            <div className="flex flex-col gap-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4 w-full">
-                                        <button
-                                            onClick={() => setIsCodePanelOpen(!isCodePanelOpen)}
-                                            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors flex-shrink-0"
-                                            title={isCodePanelOpen ? "Close Code Panel" : "Open Code Panel"}
-                                        >
-                                            {isCodePanelOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
-                                        </button>
-
-                                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide flex-1">
-                                            {generatedComponents.map(c => (
-                                                <button
-                                                    key={c.id}
-                                                    onClick={() => {
-                                                        setActiveComponentId(c.id);
-                                                        setPreviewMode('generated');
-                                                    }}
-                                                    className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all border ${activeComponentId === c.id
-                                                        ? 'bg-white text-black border-white'
-                                                        : 'bg-black text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-white'
-                                                        }`}
-                                                >
-                                                    {c.name}
-                                                </button>
-                                            ))}
+                            {/* Content Area */}
+                            <div className="flex-1 overflow-hidden relative">
+                                {/* Code Tab */}
+                                <div className={`absolute inset-0 ${activeTab === 'code' ? 'block' : 'hidden'}`}>
+                                    <div className="h-full flex flex-col">
+                                        <div className="p-2 border-b border-white/5 flex justify-end gap-2 bg-zinc-900/30">
+                                            <CopyButton text={activeComponent.code} />
+                                            <button
+                                                onClick={() => generateDownload(activeComponent.name, activeComponent.code)}
+                                                className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-all"
+                                                title="Download"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        <div className="flex-1 overflow-auto">
+                                            <CodeDisplay code={activeComponent.code} />
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Comparison Tabs */}
-                                <div className="flex bg-zinc-900 rounded-lg p-1 w-fit">
+                                {/* Chat Tab */}
+                                <div className={`absolute inset-0 p-4 ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
+                                    <ChatInterface
+                                        onSendMessage={handleRefine}
+                                        isLoading={isRefining}
+                                        history={activeComponent.history}
+                                        onRevert={handleRevert}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: PREVIEW (Flex-1) */}
+                        <div className="flex-1 flex flex-col gap-4 min-w-0 h-full">
+                            {/* Toolbar */}
+                            <div className="flex items-center justify-between shrink-0 bg-zinc-900/50 p-2 rounded-lg border border-white/5">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => setIsCodePanelOpen(!isCodePanelOpen)}
+                                        className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+                                        title={isCodePanelOpen ? "Close Sidebar" : "Open Sidebar"}
+                                    >
+                                        {isCodePanelOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeftOpen className="w-5 h-5" />}
+                                    </button>
+
+                                    <div className="h-4 w-[1px] bg-zinc-700 mx-2"></div>
+
+                                    {/* Component Tabs */}
+                                    <div className="flex gap-1 overflow-x-auto scrollbar-hide max-w-[400px]">
+                                        {generatedComponents.map(c => (
+                                            <button
+                                                key={c.id}
+                                                onClick={() => {
+                                                    setActiveComponentId(c.id);
+                                                    setPreviewMode('generated');
+                                                }}
+                                                className={`px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap transition-all ${activeComponentId === c.id
+                                                    ? 'bg-zinc-800 text-white shadow-sm'
+                                                    : 'text-zinc-500 hover:text-zinc-300'
+                                                    }`}
+                                            >
+                                                {c.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* View Mode Toggle */}
+                                <div className="flex bg-zinc-950 rounded-md p-1 border border-white/5">
                                     <button
                                         onClick={() => setPreviewMode('generated')}
-                                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${previewMode === 'generated'
-                                            ? 'bg-zinc-800 text-white shadow-sm'
-                                            : 'text-zinc-400 hover:text-white'
+                                        className={`px-3 py-1.5 rounded-sm text-xs font-medium transition-all ${previewMode === 'generated'
+                                            ? 'bg-zinc-800 text-white'
+                                            : 'text-zinc-500 hover:text-white'
                                             }`}
                                     >
                                         Live Preview
                                     </button>
                                     <button
                                         onClick={() => setPreviewMode('original')}
-                                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${previewMode === 'original'
-                                            ? 'bg-zinc-800 text-white shadow-sm'
-                                            : 'text-zinc-400 hover:text-white'
+                                        className={`px-3 py-1.5 rounded-sm text-xs font-medium transition-all ${previewMode === 'original'
+                                            ? 'bg-zinc-800 text-white'
+                                            : 'text-zinc-500 hover:text-white'
                                             }`}
                                     >
-                                        Original Screenshot
+                                        Original
                                     </button>
                                 </div>
                             </div>
 
-                            {/* Preview Area */}
-                            <div className="flex-1 border border-white/10 rounded-xl overflow-hidden bg-zinc-900/50 shadow-2xl relative">
+                            {/* Main Preview Frame */}
+                            <div className="flex-1 border border-white/10 rounded-xl overflow-hidden bg-zinc-950 shadow-2xl relative min-h-0">
                                 {previewMode === 'generated' ? (
-                                    <LivePreview code={activeComponent.code} />
+                                    <div className="w-full h-full iframe-container">
+                                        <LivePreview code={activeComponent.code} />
+                                    </div>
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center p-8 bg-black">
+                                    <div className="w-full h-full flex items-center justify-center p-8 bg-black overflow-hidden">
                                         {sections.find(s => s.id === activeComponent.id)?.screenshot ? (
                                             /* eslint-disable-next-line @next/next/no-img-element */
                                             <img
@@ -300,14 +406,6 @@ function GeneratePageContent() {
                                         )}
                                     </div>
                                 )}
-                            </div>
-
-                            {/* Chat / Refine */}
-                            <div className="mt-auto">
-                                <ChatInterface
-                                    onSendMessage={handleRefine}
-                                    isLoading={isRefining}
-                                />
                             </div>
                         </div>
                     </div>

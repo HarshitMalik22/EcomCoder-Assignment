@@ -22,18 +22,18 @@ export default function CodeDisplay({ code }: CodeDisplayProps) {
                 options={{
                     classes: {
                         "sp-layout": "!bg-zinc-950 !border-none !h-full",
-                        "sp-editor": "!h-full"
+                        "sp-editor": "!h-auto !min-h-full"
                     }
                 }}
             >
                 <SandpackLayout className="!h-full !block">
-                    <div className="h-full overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                    <div className="h-full overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent pb-10">
                         <SandpackCodeEditor
                             showLineNumbers
                             showInlineErrors
                             readOnly
                             wrapContent
-                            className="!h-full !font-mono !text-sm"
+                            className="!font-mono !text-sm !h-auto"
                         />
                     </div>
                 </SandpackLayout>

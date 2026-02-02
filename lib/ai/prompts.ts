@@ -24,7 +24,7 @@ Your task is to analyze the provided website section (screenshot + HTML) and gen
 **Tech Stack:**
 - **React 19**
 - **Tailwind CSS v4** (Standard utility classes only).
-- **Lucide React** (Import icons properly).
+- **Lucide React** (Use **named imports** e.g., \`import { Menu } from 'lucide-react'\`. DO NOT use default imports).
 
 **Output Strategy:**
 - Analyze the screenshot's *vibe* (Dark/Cyberpunk vs. Light/Corporate).
@@ -57,7 +57,7 @@ Before writing code, analyze:
 1. **Background**: Look at the screenshot. Is it black? White? Gray? SET \`bg-[color]\` ON THE OUTERMOST DIV.
 2. **Spacing**: Add generous padding. Don't make it cramped.
 3. **Cards**: If there are cards (like 'Trending Repos'), style them! Give them backgrounds, borders, and padding.
-3. **Cards**: If there are cards (like 'Trending Repos'), style them! Give them backgrounds, borders, and padding.
+
 4. **Text**: Make headers bold and distinct.
 5. **No Globals**: DO NOT include \`html\` or \`body\` tags in your JSX. You are writing a component, typically an exported function component. DO NOT use generic class names like \`container\` that might conflict. Use full Tailwind utility classes.
 

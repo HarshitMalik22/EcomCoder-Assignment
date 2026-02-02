@@ -63,8 +63,8 @@ export default function SectionSelector({ sections, onGenerate, isGenerating }: 
                         key={section.id}
                         onClick={() => toggleSection(section.id)}
                         className={`group relative rounded-xl border-2 overflow-hidden cursor-pointer transition-all duration-300 ${selectedIds.includes(section.id)
-                                ? 'border-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.3)] bg-zinc-900'
-                                : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/50'
+                            ? 'border-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.3)] bg-zinc-900'
+                            : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/50'
                             }`}
                     >
                         {/* Header / Meta */}
@@ -92,7 +92,7 @@ export default function SectionSelector({ sections, onGenerate, isGenerating }: 
                                 <img
                                     src={`data:image/jpeg;base64,${section.screenshot}`}
                                     alt={section.type}
-                                    className="w-full h-full object-cover object-top transition-transform duration-700 group-hover:scale-105"
+                                    className="w-full h-full object-contain object-center transition-transform duration-700 group-hover:scale-105"
                                 />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-zinc-600">

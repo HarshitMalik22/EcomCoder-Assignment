@@ -5,6 +5,7 @@ export interface GeneratedComponent {
     description?: string;
     installCommand?: string; // dependencies
     previewHeight?: string;
+    history?: { timestamp: number; code: string; prompt?: string }[];
 }
 
 export interface GenerationRequest {
