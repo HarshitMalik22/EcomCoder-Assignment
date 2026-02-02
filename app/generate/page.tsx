@@ -254,13 +254,17 @@ function GeneratePageContent() {
     };
 
     if (!url) {
-        return <div className="p-10 text-center">No URL provided</div>;
-    }
+                return (
+                    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+                        <p className="text-zinc-500">No URL provided. Go back and enter a URL.</p>
+                    </div>
+                );
+            }
 
-    const activeComponent = generatedComponents.find(c => c.id === activeComponentId);
+            const activeComponent = generatedComponents.find(c => c.id === activeComponentId);
 
     return (
-        <div className="min-h-screen bg-black text-white p-4 md:p-6 overflow-hidden max-h-screen flex flex-col" suppressHydrationWarning>
+        <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 md:p-6 overflow-hidden max-h-screen flex flex-col" suppressHydrationWarning>
             {/* Header - Compact */}
             <div className="flex items-center justify-between mb-4 shrink-0" suppressHydrationWarning>
                 <div className="flex items-center gap-4">
@@ -285,7 +289,7 @@ function GeneratePageContent() {
                         <button
                             onClick={handleRegenerate}
                             disabled={isRegenerating}
-                            className="flex items-center gap-2 text-zinc-500 hover:text-violet-400 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-2 text-zinc-500 hover:text-amber-400 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Regenerate Component"
                         >
                             <RotateCcw className={`w-3.5 h-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
@@ -303,10 +307,10 @@ function GeneratePageContent() {
 
                 {/* STATE: DETECTING */}
                 {step === 'detecting' && (
-                    <div className="flex flex-col items-center justify-center h-full animate-in fade-in duration-700">
-                        <Loader2 className="w-12 h-12 text-violet-500 animate-spin mb-4" />
-                        <h2 className="text-2xl font-semibold">Scanning Website...</h2>
-                        <p className="text-zinc-500 mt-2">Analyzing structure, capturing screenshots, and identifying components.</p>
+                    <div className="flex flex-col items-center justify-center h-full">
+                        <Loader2 className="w-12 h-12 text-amber-500 animate-spin mb-4" />
+                        <h2 className="text-xl font-semibold">Scanning page…</h2>
+                        <p className="text-zinc-500 text-sm mt-1">Detecting sections and capturing screenshots.</p>
                     </div>
                 )}
 
@@ -323,13 +327,10 @@ function GeneratePageContent() {
 
                 {/* STATE: GENERATING */}
                 {step === 'generating' && (
-                    <div className="flex flex-col items-center justify-center h-full animate-in fade-in duration-700">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-violet-500 blur-xl opacity-20 animate-pulse"></div>
-                            <Loader2 className="w-16 h-16 text-violet-500 animate-spin relative z-10" />
-                        </div>
-                        <h2 className="text-2xl font-semibold mt-8">Generating AI Components...</h2>
-                        <p className="text-zinc-500 mt-2">Writing React code, generating Tailwind styles, and optimizing accessibility.</p>
+                    <div className="flex flex-col items-center justify-center h-full">
+                        <Loader2 className="w-16 h-16 text-amber-500 animate-spin mb-6" />
+                        <h2 className="text-xl font-semibold mt-6">Generating components…</h2>
+                        <p className="text-zinc-500 text-sm mt-1">Writing React and Tailwind.</p>
                     </div>
                 )}
 
@@ -346,13 +347,13 @@ function GeneratePageContent() {
                                 <button
                                     onClick={() => setActiveTab('code')}
                                     // Toggle code view
-                                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'code' ? 'border-violet-500 text-white bg-white/5' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'code' ? 'border-amber-500 text-white bg-white/5' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
                                 >
                                     Code
                                 </button>
                                 <button
                                     onClick={() => setActiveTab('chat')}
-                                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 flex items-center justify-center gap-2 ${activeTab === 'chat' ? 'border-violet-500 text-white bg-white/5' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
+                                    className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 flex items-center justify-center gap-2 ${activeTab === 'chat' ? 'border-amber-500 text-white bg-white/5' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
                                 >
                                     <span>Refine</span>
                                 </button>
@@ -381,6 +382,16 @@ function GeneratePageContent() {
                                                         ? activeComponent.history[activeComponent.history.length - 2].code
                                                         : undefined
                                                 }
+                                                editable
+                                                onChange={(nextCode) => {
+                                                    setGeneratedComponents(prev =>
+                                                        prev.map(c =>
+                                                            c.id === activeComponent.id
+                                                                ? { ...c, code: nextCode }
+                                                                : c
+                                                        )
+                                                    );
+                                                }}
                                             />
                                         </div>
                                     </div>
@@ -487,7 +498,7 @@ function GeneratePageContent() {
 
 export default function GeneratePage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>}>
+        <Suspense fallback={<div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-400">Loading...</div>}>
             <GeneratePageContent />
         </Suspense>
     );

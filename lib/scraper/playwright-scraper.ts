@@ -1,4 +1,4 @@
-import { chromium, Browser, Page, BrowserContext } from 'playwright';
+import { chromium, Browser, Page } from 'playwright';
 import { ScrapedSection, ScrapedPageResult, ScrapeOptions } from '@/types/scraper';
 
 /**
@@ -48,72 +48,154 @@ async function applyStealthScripts(page: Page): Promise<void> {
     });
 }
 
+/**
+ * Dismiss cookie consent overlays so screenshots are clean. We never click "Accept" –
+ * only "Decline" / "Reject" / "Necessary only", or we hide/remove the banner from the DOM.
+ */
+async function dismissCookieBannerForScreenshot(page: Page): Promise<void> {
+    try {
+        const declineSelectors = [
+            'button:has-text("Decline")',
+            'button:has-text("Reject")',
+            'button:has-text("Reject all")',
+            'button:has-text("Only necessary")',
+            'button:has-text("Necessary only")',
+            'button:has-text("No thanks")',
+            'button:has-text("Decline all")',
+            '[aria-label*="Decline" i]',
+            '[aria-label*="Reject" i]',
+            'a:has-text("Decline")',
+            'a:has-text("Reject")',
+        ];
+        for (const selector of declineSelectors) {
+            const btn = page.locator(selector).first();
+            if ((await btn.count()) > 0) {
+                await btn.click({ timeout: 2000 }).catch(() => {});
+                await page.waitForTimeout(400);
+                return;
+            }
+        }
+
+        await page.evaluate(() => {
+            const bannerPhrases = ['we value your privacy', 'cookie', 'cookies', 'gdpr', 'consent'];
+            const acceptPhrases = ['accept', 'allow all', 'agree'];
+
+            const candidates = document.querySelectorAll(
+                '[role="dialog"], [class*="modal"], [class*="banner"], [class*="consent"], [class*="cookie"], [id*="cookie"], [id*="consent"]'
+            );
+            for (const el of Array.from(candidates)) {
+                if (!(el instanceof HTMLElement)) continue;
+                const text = (el.innerText || el.textContent || '').toLowerCase();
+                const looksLikeBanner = bannerPhrases.some(p => text.includes(p));
+                const hasAcceptButton = acceptPhrases.some(p => text.includes(p));
+                if (looksLikeBanner && (hasAcceptButton || text.length < 600)) {
+                    el.style.setProperty('display', 'none', 'important');
+                }
+            }
+        });
+    } catch {
+        // Non-fatal: scraping continues even if banner stays
+    }
+}
+
+/**
+ * Block cookies: strip Set-Cookie from document responses so we never store cookies.
+ * We do not accept cookie banners or consent – no cookies are requested or stored.
+ * Only document requests are intercepted to keep scraping fast.
+ */
+async function blockCookies(page: Page): Promise<void> {
+    await page.route('**/*', async (route) => {
+        if (route.request().resourceType() !== 'document') {
+            await route.continue();
+            return;
+        }
+        const response = await route.fetch().catch(() => null);
+        if (!response) {
+            await route.abort();
+            return;
+        }
+        const raw = response.headers();
+        const headers: Record<string, string> = {};
+        for (const name of Object.keys(raw)) {
+            if (name.toLowerCase() !== 'set-cookie') headers[name] = raw[name];
+        }
+        await route.fulfill({
+            status: response.status(),
+            headers,
+            body: await response.body(),
+        });
+    });
+}
+
 export class PlaywrightScraper {
     private browser: Browser | null = null;
 
     async scrape(url: string, options: ScrapeOptions = { url }): Promise<ScrapedPageResult> {
         this.browser = await chromium.launch({
-            headless: true, // Manual stealth scripts help avoid detection
+            headless: true,
             args: [
                 '--disable-blink-features=AutomationControlled',
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
                 '--disable-infobars',
                 '--window-position=0,0',
-                '--ignore-certifcate-errors',
-                '--ignore-certifcate-errors-spki-list',
-                '--disable-accelerated-2d-canvas',
+                '--ignore-certificate-errors',
+                '--ignore-certificate-errors-spki-list',
                 '--disable-gpu',
-            ]
+                '--disable-software-rasterizer',
+                '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-sync',
+                '--disable-default-apps',
+                '--mute-audio',
+                '--no-first-run',
+            ],
+            timeout: 30000,
         });
 
-        // standard Playwright context creation
         const context = await this.browser.newContext({
             viewport: { width: 1920, height: 1080 },
             userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             locale: 'en-US',
             timezoneId: 'America/New_York',
-            // permissions: ['geolocation'], // Granting permissions sometimes looks more human
+            ignoreHTTPSErrors: true,
+            javaScriptEnabled: true,
         });
+
+        await context.clearCookies();
 
         const page = await context.newPage();
 
         try {
-            // Apply stealth scripts to avoid bot detection
             await applyStealthScripts(page);
 
-            // Add comprehensive headers
+            // Block cookies: strip Set-Cookie from all responses – we never store or accept cookies
+            await blockCookies(page);
+
             await page.setExtraHTTPHeaders({
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Referer': 'https://www.google.com/',
-                'Upgrade-Insecure-Requests': '1',
                 'Sec-Fetch-Dest': 'document',
                 'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
                 'Sec-Fetch-User': '?1',
-                'Cache-Control': 'max-age=0'
             });
 
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
-            // --- EVASION: HUMAN BEHAVIOR SIMULATION ---
-            // 1. Move mouse randomly to trigger "human" event listeners
-            await this.simulateHumanMouseMovements(page);
-
-            // 2. Random small scroll to trigger lazy loading and interaction observers
-            await page.mouse.wheel(0, 500);
-            await page.waitForTimeout(1000 + Math.random() * 2000); // Random wait
-            // ------------------------------------------
+            // Light scroll to trigger lazy content
+            await page.mouse.wheel(0, 300);
 
             try {
-                await page.waitForLoadState('load', { timeout: 10000 });
-            } catch (e) {
-                console.warn("Load state 'load' timed out, continuing with 'domcontentloaded'");
+                await page.waitForLoadState('networkidle', { timeout: 8000 });
+            } catch {
+                await page.waitForLoadState('load', { timeout: 5000 }).catch(() => {});
             }
 
-            // Wait specifically for animations/fade-ins
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(800);
+
+            await dismissCookieBannerForScreenshot(page);
+            await page.waitForTimeout(300);
 
             const title = await page.title();
 
@@ -264,27 +346,6 @@ export class PlaywrightScraper {
             if (this.browser) {
                 await this.browser.close();
             }
-        }
-    }
-
-    /**
-     * Simulates imperfect human mouse movement to trick behavior-based detectors.
-     */
-    private async simulateHumanMouseMovements(page: Page) {
-        // Simple bezier-like curve simulation or just random points
-        const width = 1920;
-        const height = 1080;
-
-        // Move to center-ish
-        await page.mouse.move(width / 2 + Math.random() * 100, height / 2 + Math.random() * 100, { steps: 5 });
-
-        // Jitter
-        for (let i = 0; i < 3; i++) {
-            await page.mouse.move(
-                width / 2 + Math.random() * 200 - 100,
-                height / 2 + Math.random() * 200 - 100,
-                { steps: 25 } // steps creates the "drag" effect vs instant teleport
-            );
         }
     }
 }

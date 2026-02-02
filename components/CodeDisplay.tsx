@@ -10,6 +10,17 @@ interface CodeDisplayProps {
      * with green (added) and red (removed) markers similar to an IDE.
      */
     previousCode?: string;
+    /**
+     * When true, the code area becomes editable.
+     * Useful for live-editing the generated component
+     * while keeping the same chrome / header styling.
+     */
+    editable?: boolean;
+    /**
+     * Callback fired when the user edits the code.
+     * Only used when `editable` is true.
+     */
+    onChange?: (nextCode: string) => void;
 }
 
 type DiffLine =
@@ -70,16 +81,20 @@ function computeLineDiff(previous: string | undefined, current: string): DiffLin
     return result;
 }
 
-export default function CodeDisplay({ code, previousCode }: CodeDisplayProps) {
+export default function CodeDisplay({ code, previousCode, editable = false, onChange }: CodeDisplayProps) {
     const diffLines = useMemo(() => computeLineDiff(previousCode, code), [previousCode, code]);
 
     const hasDiff = !!previousCode && previousCode.trim() !== code.trim();
 
+    const showEditable = editable && typeof onChange === "function";
+
     return (
         <div className="rounded-xl overflow-hidden border border-white/10 shadow-lg h-full flex flex-col bg-zinc-950">
             <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 bg-zinc-900/70 text-xs text-zinc-400">
-                <span className="font-medium text-zinc-200">Code</span>
-                {hasDiff && (
+                <span className="font-medium text-zinc-200">
+                    {showEditable ? "Editable Code" : "Code"}
+                </span>
+                {!showEditable && hasDiff && (
                     <span className="flex items-center gap-2">
                         <span className="flex items-center gap-1">
                             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
@@ -91,48 +106,64 @@ export default function CodeDisplay({ code, previousCode }: CodeDisplayProps) {
                         </span>
                     </span>
                 )}
+                {showEditable && (
+                    <span className="text-[10px] text-zinc-500">
+                        Edits update the live preview
+                    </span>
+                )}
             </div>
 
-            <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-                <pre className="text-xs md:text-sm font-mono text-zinc-100 p-3 min-w-full">
-                    {diffLines.map((line, index) => {
-                        const isAdded = line.type === "added";
-                        const isRemoved = line.type === "removed";
-                        const isUnchanged = line.type === "unchanged";
+            {/* Editable mode: simple controlled textarea for live editing */}
+            {showEditable ? (
+                <div className="flex-1 overflow-auto">
+                    <textarea
+                        className="w-full h-full resize-none bg-transparent text-xs md:text-sm font-mono text-zinc-100 p-3 outline-none border-0 leading-6"
+                        value={code}
+                        spellCheck={false}
+                        onChange={(e) => onChange(e.target.value)}
+                    />
+                </div>
+            ) : (
+                <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+                    <pre className="text-xs md:text-sm font-mono text-zinc-100 p-3 min-w-full">
+                        {diffLines.map((line, index) => {
+                            const isAdded = line.type === "added";
+                            const isRemoved = line.type === "removed";
 
-                        const bgClass = isAdded
-                            ? "bg-emerald-500/10"
-                            : isRemoved
-                                ? "bg-red-500/10"
-                                : "";
-                        const borderClass = isAdded
-                            ? "border-l-2 border-emerald-500"
-                            : isRemoved
-                                ? "border-l-2 border-red-500"
-                                : "border-l border-zinc-800/60";
-                        const marker = isAdded ? "+" : isRemoved ? "-" : " ";
+                            const bgClass = isAdded
+                                ? "bg-emerald-500/10"
+                                : isRemoved
+                                    ? "bg-red-500/10"
+                                    : "";
+                            const borderClass = isAdded
+                                ? "border-l-2 border-emerald-500"
+                                : isRemoved
+                                    ? "border-l-2 border-red-500"
+                                    : "border-l border-zinc-800/60";
+                            const marker = isAdded ? "+" : isRemoved ? "-" : " ";
 
-                        const content = isRemoved ? line.oldLine : line.newLine ?? "";
+                            const content = isRemoved ? line.oldLine : line.newLine ?? "";
 
-                        return (
-                            <div
-                                key={index}
-                                className={`flex items-stretch ${bgClass} ${borderClass}`}
-                            >
-                                <span className="w-8 shrink-0 text-right pr-1 text-[10px] leading-6 text-zinc-500 select-none">
-                                    {index + 1}
-                                </span>
-                                <span className="w-4 shrink-0 text-center text-[10px] leading-6 select-none text-zinc-500">
-                                    {marker}
-                                </span>
-                                <span className="whitespace-pre leading-6 flex-1">
-                                    {content}
-                                </span>
-                            </div>
-                        );
-                    })}
-                </pre>
-            </div>
+                            return (
+                                <div
+                                    key={index}
+                                    className={`flex items-stretch ${bgClass} ${borderClass}`}
+                                >
+                                    <span className="w-8 shrink-0 text-right pr-1 text-[10px] leading-6 text-zinc-500 select-none">
+                                        {index + 1}
+                                    </span>
+                                    <span className="w-4 shrink-0 text-center text-[10px] leading-6 select-none text-zinc-500">
+                                        {marker}
+                                    </span>
+                                    <span className="whitespace-pre leading-6 flex-1">
+                                        {content}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </pre>
+                </div>
+            )}
         </div>
     );
 }

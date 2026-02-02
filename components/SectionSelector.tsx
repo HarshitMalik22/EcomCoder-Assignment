@@ -32,8 +32,8 @@ export default function SectionSelector({ sections, onGenerate, isGenerating }: 
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                        <Layers className="w-6 h-6 text-violet-500" />
-                        Select Sections to Generate
+                        <Layers className="w-6 h-6 text-amber-500" />
+                        Select sections to generate
                     </h2>
                     <p className="text-zinc-400 text-sm">Convert specific parts or the whole page.</p>
                 </div>
@@ -41,7 +41,7 @@ export default function SectionSelector({ sections, onGenerate, isGenerating }: 
                 <div className="flex gap-2 bg-zinc-900 rounded-lg p-1 border border-white/10">
                     <button
                         onClick={() => setFilter('all')}
-                        className={`px-3 py-1.5 rounded-md text-sm transition-all ${filter === 'all' ? 'bg-violet-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'}`}
+                        className={`px-3 py-1.5 rounded-md text-sm transition-all ${filter === 'all' ? 'bg-amber-600 text-zinc-900 font-medium' : 'text-zinc-400 hover:text-white'}`}
                     >
                         All
                     </button>
@@ -49,7 +49,7 @@ export default function SectionSelector({ sections, onGenerate, isGenerating }: 
                         <button
                             key={type}
                             onClick={() => setFilter(type)}
-                            className={`px-3 py-1.5 rounded-md text-sm capitalize transition-all ${filter === type ? 'bg-violet-600 text-white shadow-lg' : 'text-zinc-400 hover:text-white'}`}
+                            className={`px-3 py-1.5 rounded-md text-sm capitalize transition-all ${filter === type ? 'bg-amber-600 text-zinc-900 font-medium' : 'text-zinc-400 hover:text-white'}`}
                         >
                             {type}
                         </button>
@@ -62,8 +62,8 @@ export default function SectionSelector({ sections, onGenerate, isGenerating }: 
                     <div
                         key={section.id}
                         onClick={() => toggleSection(section.id)}
-                        className={`group relative rounded-xl border-2 overflow-hidden cursor-pointer transition-all duration-300 ${selectedIds.includes(section.id)
-                            ? 'border-violet-500 shadow-[0_0_20px_rgba(139,92,246,0.3)] bg-zinc-900'
+                        className={`group relative rounded-xl border-2 overflow-hidden cursor-pointer transition-all duration-200 ${selectedIds.includes(section.id)
+                            ? 'border-amber-500 bg-zinc-900'
                             : 'border-zinc-800 hover:border-zinc-700 bg-zinc-900/50'
                             }`}
                     >
@@ -81,13 +81,13 @@ export default function SectionSelector({ sections, onGenerate, isGenerating }: 
                         </div>
 
                         {/* Checkbox Overlay */}
-                        <div className={`absolute top-3 right-3 z-20 px-2 py-2 rounded-full transition-all ${selectedIds.includes(section.id) ? 'bg-violet-600 text-white' : 'bg-zinc-800/80 text-zinc-500 group-hover:bg-zinc-700'
+                        <div className={`absolute top-3 right-3 z-20 px-2 py-2 rounded-full transition-all ${selectedIds.includes(section.id) ? 'bg-amber-500 text-zinc-900' : 'bg-zinc-800/80 text-zinc-500 group-hover:bg-zinc-700'
                             }`}>
                             <Check className={`w-4 h-4 transition-transform ${selectedIds.includes(section.id) ? 'scale-100' : 'scale-75'}`} />
                         </div>
 
                         {/* Selection Overlay */}
-                        <div className={`absolute inset-0 bg-violet-600/10 z-10 transition-opacity ${selectedIds.includes(section.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-10'}`} />
+                        <div className={`absolute inset-0 bg-amber-500/5 z-10 transition-opacity ${selectedIds.includes(section.id) ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`} />
 
                         {/* Preview Image */}
                         <div className="aspect-[16/10] bg-zinc-950 w-full overflow-hidden">
@@ -116,7 +116,7 @@ export default function SectionSelector({ sections, onGenerate, isGenerating }: 
                 <button
                     onClick={() => onGenerate(selectedIds)}
                     disabled={selectedIds.length === 0 || isGenerating}
-                    className="pointer-events-auto flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white px-8 py-3 rounded-xl font-bold text-lg shadow-xl shadow-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-105 active:scale-95"
+                    className="pointer-events-auto flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-zinc-900 font-semibold px-8 py-3 rounded-xl text-base disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                     {isGenerating ? (
                         <>
