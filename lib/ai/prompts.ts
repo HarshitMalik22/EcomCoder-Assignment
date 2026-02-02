@@ -80,6 +80,9 @@ export default function ProductGrid() {
 - For images, use \`<img>\` with Tailwind classes for sizing: \`<img src="/placeholder.jpg" alt="..." className="w-full h-auto object-cover" />\`
 - Use placeholder URLs like \`https://via.placeholder.com/400x300\` or \`/api/placeholder/400/300\`
 - Always include \`alt\` attributes for accessibility
+- If the original section includes prominent illustrations, hero artwork, product screenshots, or animated-looking visuals, ALWAYS recreate that part of the layout:
+  - Use similarly sized \`<img>\` elements, gradient blocks, or simple animated Tailwind utilities (e.g. \`animate-pulse\`, \`animate-bounce\`) to capture the same visual role.
+  - Do not drop image/visual areas entirely — every major image region in the screenshot should have a clear visual counterpart in the generated component.
 
 **Visual Replication Rules (Approximate, not pixel-perfect):**
 1. **Layout & Structure**:
@@ -120,7 +123,7 @@ Recreate this '${type}' section as a React component.
 
 **INPUT ANALYSIS:**
 - **Screenshot**: Primary source for VISUAL STYLES (Colors, Fonts, Spacing, Vibe).
-- **HTML Context**: Primary source for STRUCTURE (Grid/Flex layouts, nesting, content grouping). Combine this with the screenshot to infer the correct Tailwind layout classes.
+- **HTML Context**: Primary source for STRUCTURE (Grid/Flex layouts, nesting, content grouping). Combine this with the screenshot to infer the correct Tailwind layout classes and to detect where images, icons, or media blocks live.
 
 **DESIGN DNA Extraction (Mental Step):**
 Before writing code, analyze:
@@ -132,8 +135,9 @@ Before writing code, analyze:
 1. **Background**: Look at the screenshot. Is it black? White? Gray? SET \`bg-[color]\` ON THE OUTERMOST DIV.
 2. **Spacing**: Match the apparent spacing from the screenshot (padding, gaps, margins). Do not arbitrarily add extra padding “just because”.
 3. **Cards**: If there are cards (like 'Trending Repos'), style them! Give them backgrounds, borders, and padding that roughly match the original.
-4. **Text**: Make headers bold and distinct, following the visual hierarchy from the screenshot.
-5. **No Globals**: DO NOT include \`html\` or \`body\` tags in your JSX. You are writing a component, typically an exported function component. DO NOT use generic class names like \`container\` that might conflict. Use full Tailwind utility classes.
+4. **Images & Visual Blocks**: If the section contains image or animation areas (hero artwork, product mockups, dashboards, logos), ALWAYS include analogous visual elements (e.g. \`<img>\` with placeholders, gradient-backed boxes, or simple animated Tailwind utilities) in roughly the same positions and proportions.
+5. **Text**: Make headers bold and distinct, following the visual hierarchy from the screenshot.
+6. **No Globals**: DO NOT include \`html\` or \`body\` tags in your JSX. You are writing a component, typically an exported function component. DO NOT use generic class names like \`container\` that might conflict. Use full Tailwind utility classes.
 
 **⚠️ FINAL REMINDER - SANDBOX RESTRICTIONS:**
 - Use \`<img>\` NOT \`<Image>\` from next/image

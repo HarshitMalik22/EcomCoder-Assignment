@@ -89,15 +89,25 @@ function GeneratePageContent() {
     useEffect(() => {
         if (!url || sections.length === 0) return;
 
+        // Persist a lightweight version of state to avoid exceeding storage quotas.
+        // We intentionally drop large screenshot payloads from individual sections,
+        // since they can be re-fetched if needed.
+        const lightweightSections = sections.map(({ screenshot, ...rest }) => rest);
+
         const state = {
             step,
-            sections,
+            sections: lightweightSections,
             fullPageScreenshot,
             selectedIds,
             generatedComponents,
             activeComponentId
         };
-        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+        try {
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (err) {
+            console.warn("Failed to persist generator state to sessionStorage (likely quota exceeded). Continuing without persistence.", err);
+        }
     }, [url, step, sections, fullPageScreenshot, selectedIds, generatedComponents, activeComponentId, STORAGE_KEY]);
 
     const [activeTab, setActiveTab] = useState<'code' | 'chat'>('code');
@@ -364,7 +374,14 @@ function GeneratePageContent() {
                                             </button>
                                         </div>
                                         <div className="flex-1 overflow-auto">
-                                            <CodeDisplay code={activeComponent.code} />
+                                            <CodeDisplay
+                                                code={activeComponent.code}
+                                                previousCode={
+                                                    activeComponent.history && activeComponent.history.length > 1
+                                                        ? activeComponent.history[activeComponent.history.length - 2].code
+                                                        : undefined
+                                                }
+                                            />
                                         </div>
                                     </div>
                                 </div>

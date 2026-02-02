@@ -72,8 +72,11 @@ export default function SectionSelector({ sections, onGenerate, isGenerating }: 
                             <span className="px-2 py-1 rounded-md bg-black/60 backdrop-blur-md text-xs font-medium text-white border border-white/10 capitalize">
                                 {section.type}
                             </span>
-                            <span className="px-2 py-1 rounded-md bg-black/60 backdrop-blur-md text-xs font-medium text-zinc-400 border border-white/10">
-                                {Math.round(section.confidence * 100)}% Match
+                            <span
+                                className="px-2 py-1 rounded-md bg-black/60 backdrop-blur-md text-xs font-medium text-zinc-400 border border-white/10"
+                                title="How confident the detector is that this section matches the shown type."
+                            >
+                                {Math.round(section.confidence * 100)}% Confidence
                             </span>
                         </div>
 
