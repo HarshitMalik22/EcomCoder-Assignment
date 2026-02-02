@@ -14,6 +14,22 @@ export async function POST(req: NextRequest) {
         let fullPageScreenshot: string | undefined;
 
         if (url && (!sections || sections.length === 0)) {
+            // Validate URL before scraping
+            try {
+                const parsedUrl = new URL(url);
+                if (!parsedUrl.hostname.includes('.') && parsedUrl.hostname !== 'localhost') {
+                    return NextResponse.json(
+                        { error: `Invalid domain "${parsedUrl.hostname}". Please enter a complete URL like "${parsedUrl.hostname}.com"` },
+                        { status: 400 }
+                    );
+                }
+            } catch {
+                return NextResponse.json(
+                    { error: 'Invalid URL format. Please enter a valid URL like https://example.com' },
+                    { status: 400 }
+                );
+            }
+
             console.log(`Detecting sections for URL: ${url}`);
             try {
                 // We'll use a short timeout/lighter scrape since we just need sections

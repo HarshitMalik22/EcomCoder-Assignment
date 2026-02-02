@@ -1,18 +1,59 @@
-// Change the import from 'playwright' to 'playwright-extra'
-import { chromium } from 'playwright-extra';
-import { Browser, Page } from 'playwright';
-import stealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { chromium, Browser, Page, BrowserContext } from 'playwright';
 import { ScrapedSection, ScrapedPageResult, ScrapeOptions } from '@/types/scraper';
 
-// Enable the Stealth Plugin
-chromium.use(stealthPlugin());
+/**
+ * Apply stealth techniques to make the browser less detectable
+ * This replaces the puppeteer-extra-plugin-stealth which has compatibility issues
+ */
+async function applyStealthScripts(page: Page): Promise<void> {
+    await page.addInitScript(() => {
+        // Override navigator.webdriver
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined,
+        });
+
+        // Override navigator.plugins to have a length > 0
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [1, 2, 3, 4, 5],
+        });
+
+        // Override navigator.languages
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en'],
+        });
+
+        // Mock chrome runtime
+        (window as any).chrome = {
+            runtime: {},
+        };
+
+        // Override permissions query
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters: any) =>
+            parameters.name === 'notifications'
+                ? Promise.resolve({ state: Notification.permission } as PermissionStatus)
+                : originalQuery(parameters);
+
+        // Spoof WebGL vendor and renderer
+        const getParameter = WebGLRenderingContext.prototype.getParameter;
+        WebGLRenderingContext.prototype.getParameter = function (parameter: number) {
+            if (parameter === 37445) {
+                return 'Intel Inc.';
+            }
+            if (parameter === 37446) {
+                return 'Intel Iris OpenGL Engine';
+            }
+            return getParameter.call(this, parameter);
+        };
+    });
+}
 
 export class PlaywrightScraper {
     private browser: Browser | null = null;
 
     async scrape(url: string, options: ScrapeOptions = { url }): Promise<ScrapedPageResult> {
         this.browser = await chromium.launch({
-            headless: true, // Stealth plugin makes headless look like headful
+            headless: true, // Manual stealth scripts help avoid detection
             args: [
                 '--disable-blink-features=AutomationControlled',
                 '--no-sandbox',
@@ -38,8 +79,8 @@ export class PlaywrightScraper {
         const page = await context.newPage();
 
         try {
-            // Note: We REMOVED the manual 'navigator.webdriver' override because 
-            // the stealth plugin handles this much more comprehensively.
+            // Apply stealth scripts to avoid bot detection
+            await applyStealthScripts(page);
 
             // Add comprehensive headers
             await page.setExtraHTTPHeaders({

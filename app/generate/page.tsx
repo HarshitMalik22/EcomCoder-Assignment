@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Download, Code, Eye, PanelLeftClose, PanelLeftOpen, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, Code, Eye, PanelLeftClose, PanelLeftOpen, RefreshCw, RotateCcw } from 'lucide-react';
 import SectionSelector from '@/components/SectionSelector';
 import LivePreview from '@/components/LivePreview';
 import ChatInterface from '@/components/ChatInterface';
@@ -25,6 +25,7 @@ function GeneratePageContent() {
     const [generatedComponents, setGeneratedComponents] = useState<GeneratedComponent[]>([]);
     const [activeComponentId, setActiveComponentId] = useState<string | null>(null);
     const [isRefining, setIsRefining] = useState(false);
+    const [isRegenerating, setIsRegenerating] = useState(false);
     const [isCodePanelOpen, setIsCodePanelOpen] = useState(true);
     const [previewMode, setPreviewMode] = useState<'generated' | 'original'>('generated');
     const { addToast } = useToast();
@@ -191,6 +192,46 @@ function GeneratePageContent() {
         addToast("Reverted to previous version", "info");
     };
 
+    // Regenerate active component
+    const handleRegenerate = async () => {
+        if (!activeComponentId) return;
+
+        const section = sections.find(s => s.id === activeComponentId);
+        if (!section) {
+            addToast("Section not found", "error");
+            return;
+        }
+
+        setIsRegenerating(true);
+
+        try {
+            const res = await fetch('/api/generate', {
+                method: 'POST',
+                body: JSON.stringify({ sectionData: section }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            const newComponent = data.data as GeneratedComponent;
+            const newHistoryItem = { timestamp: Date.now(), code: newComponent.code, prompt: 'Regenerated' };
+
+            setGeneratedComponents(prev => prev.map(c =>
+                c.id === activeComponentId ? {
+                    ...c,
+                    code: newComponent.code,
+                    history: [...(c.history || []), newHistoryItem]
+                } : c
+            ));
+
+            addToast("Component regenerated!", "success");
+        } catch (e) {
+            addToast("Regeneration failed: " + (e as Error).message, "error");
+        } finally {
+            setIsRegenerating(false);
+        }
+    };
+
     const handleBack = () => {
         if (step === 'preview') {
             setStep('selecting');
@@ -220,7 +261,7 @@ function GeneratePageContent() {
                         <ArrowLeft className="w-4 h-4" />
                         Back
                     </button>
-                    {(step === 'selecting' || step === 'preview') && (
+                    {step === 'selecting' && (
                         <button
                             onClick={() => detectSections(true)}
                             className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-sm"
@@ -228,6 +269,17 @@ function GeneratePageContent() {
                         >
                             <RefreshCw className="w-3.5 h-3.5" />
                             Rescan
+                        </button>
+                    )}
+                    {step === 'preview' && (
+                        <button
+                            onClick={handleRegenerate}
+                            disabled={isRegenerating}
+                            className="flex items-center gap-2 text-zinc-500 hover:text-violet-400 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Regenerate Component"
+                        >
+                            <RotateCcw className={`w-3.5 h-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
+                            {isRegenerating ? 'Regenerating...' : 'Regenerate'}
                         </button>
                     )}
                 </div>
@@ -283,6 +335,7 @@ function GeneratePageContent() {
                             <div className="flex border-b border-white/5 bg-zinc-900/50">
                                 <button
                                     onClick={() => setActiveTab('code')}
+                                    // Toggle code view
                                     className={`flex-1 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'code' ? 'border-violet-500 text-white bg-white/5' : 'border-transparent text-zinc-500 hover:text-zinc-300'}`}
                                 >
                                     Code
