@@ -1,4 +1,5 @@
 import URLInput from "@/components/URLInput";
+import { Highlighter } from "@/components/ui/highlighter";
 import { Code2, Copy, Layers } from "lucide-react";
 
 export default function Home() {
@@ -21,8 +22,14 @@ export default function Home() {
         </div>
 
         <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          Turn Any Website <br />
-          into <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-300">React Code</span>
+          <Highlighter action="underline" color="#fbbf24" strokeWidth={2} animationDuration={800}>
+            Turn Any Website
+          </Highlighter>{" "}
+          <br />
+          into{" "}
+          <Highlighter action="highlight" color="#fcd34d" strokeWidth={1.5} animationDuration={800}>
+            React Code
+          </Highlighter>
         </h1>
 
         <p className="text-lg md:text-xl text-zinc-400 max-w-2xl mb-8 animate-in fade-in slide-in-from-bottom-5 duration-700 delay-100">

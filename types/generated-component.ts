@@ -8,6 +8,13 @@ export interface GeneratedComponent {
     history?: { timestamp: number; code: string; prompt?: string }[];
 }
 
+export interface SectionImagePlaceholder {
+    src: string;
+    alt?: string;
+    width?: number;
+    height?: number;
+}
+
 export interface GenerationRequest {
     model?: 'claude' | 'openai';
     sectionData: {
@@ -15,6 +22,7 @@ export interface GenerationRequest {
         type: string;
         screenshot?: string;
         html?: string;
+        images?: SectionImagePlaceholder[];
     };
     customPrompt?: string; // from chat iteration
 }

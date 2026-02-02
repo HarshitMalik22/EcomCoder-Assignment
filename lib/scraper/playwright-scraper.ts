@@ -295,6 +295,29 @@ export class PlaywrightScraper {
                     const uniqueId = `scraped-section-${counter++}`;
                     el.setAttribute('data-scraped-id', uniqueId);
 
+                    const base = document.location.origin;
+                    const resolveSrc = (src: string | null): string => {
+                        if (!src || !src.trim()) return '';
+                        const s = src.trim();
+                        if (s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:')) return s;
+                        if (s.startsWith('//')) return document.location.protocol + s;
+                        return base + (s.startsWith('/') ? s : '/' + s);
+                    };
+                    const imgs = el.querySelectorAll('img');
+                    const images = Array.from(imgs).map((img) => {
+                        const i = img as HTMLImageElement;
+                        const src = resolveSrc(i.currentSrc || i.getAttribute('src'));
+                        if (!src) return null;
+                        const w = i.getAttribute('width');
+                        const h = i.getAttribute('height');
+                        return {
+                            src,
+                            alt: i.getAttribute('alt') || undefined,
+                            width: w ? parseInt(w, 10) : (i.naturalWidth || undefined),
+                            height: h ? parseInt(h, 10) : (i.naturalHeight || undefined),
+                        };
+                    }).filter((x): x is NonNullable<typeof x> => x !== null);
+
                     results.push({
                         id: uniqueId,
                         tagName: el.tagName.toLowerCase(),
@@ -306,7 +329,8 @@ export class PlaywrightScraper {
                             y: rect.y + window.scrollY,
                             width: rect.width,
                             height: rect.height
-                        }
+                        },
+                        images: images.length ? images : undefined
                     });
                 }
                 return results;

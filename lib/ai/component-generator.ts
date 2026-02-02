@@ -55,7 +55,7 @@ async function generateWithClaude(request: GenerationRequest): Promise<Generated
     const userContent: any[] = [
         {
             type: 'text',
-            text: customPrompt || generateUserPrompt(sectionData.type, sectionData.html)
+            text: customPrompt || generateUserPrompt(sectionData.type, sectionData.html, sectionData.images)
         }
     ];
 
@@ -108,7 +108,7 @@ async function generateWithOpenAI(request: GenerationRequest): Promise<Generated
         {
             role: "user",
             content: [
-                { type: "text", text: customPrompt || generateUserPrompt(sectionData.type, sectionData.html) }
+                { type: "text", text: customPrompt || generateUserPrompt(sectionData.type, sectionData.html, sectionData.images) }
             ]
         }
     ];

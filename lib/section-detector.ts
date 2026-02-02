@@ -210,6 +210,7 @@ export class SectionDetector {
             screenshot: section.screenshot,
             html: section.html,
             text: section.text,
+            images: section.images,
         };
     }
 }

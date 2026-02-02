@@ -117,7 +117,18 @@ export default function ProductGrid() {
 - **ALL CODE MUST BE SELF-CONTAINED** - no undefined components!
 `;
 
-export const generateUserPrompt = (type: string, htmlContext?: string) => `
+export interface ImagePlaceholderForPrompt {
+    src: string;
+    alt?: string;
+    width?: number;
+    height?: number;
+}
+
+export const generateUserPrompt = (
+    type: string,
+    htmlContext?: string,
+    images?: ImagePlaceholderForPrompt[]
+) => `
 **GOAL: VISUAL REPLICA**
 Recreate this '${type}' section as a React component. 
 
@@ -135,7 +146,7 @@ Before writing code, analyze:
 1. **Background**: Look at the screenshot. Is it black? White? Gray? SET \`bg-[color]\` ON THE OUTERMOST DIV.
 2. **Spacing**: Match the apparent spacing from the screenshot (padding, gaps, margins). Do not arbitrarily add extra padding “just because”.
 3. **Cards**: If there are cards (like 'Trending Repos'), style them! Give them backgrounds, borders, and padding that roughly match the original.
-4. **Images & Visual Blocks**: If the section contains image or animation areas (hero artwork, product mockups, dashboards, logos), ALWAYS include analogous visual elements (e.g. \`<img>\` with placeholders, gradient-backed boxes, or simple animated Tailwind utilities) in roughly the same positions and proportions.
+4. **Images & Visual Blocks**: If the section contains image or animation areas (hero artwork, product mockups, dashboards, logos), ALWAYS include analogous visual elements. When an **IMAGE PLACEHOLDERS** list is provided below, use those exact \`src\`, \`alt\`, and dimensions in your \`<img>\` elements so the generated component matches the DOM and screenshot. Otherwise use \`<img>\` with placeholder URLs matching the apparent size from the screenshot.
 5. **Text**: Make headers bold and distinct, following the visual hierarchy from the screenshot.
 6. **No Globals**: DO NOT include \`html\` or \`body\` tags in your JSX. You are writing a component, typically an exported function component. DO NOT use generic class names like \`container\` that might conflict. Use full Tailwind utility classes.
 
@@ -146,6 +157,13 @@ Before writing code, analyze:
 - ONLY import from: 'react' and 'lucide-react'
 - **DO NOT USE UNDEFINED COMPONENTS** like \`<ProductCard>\`, \`<FeatureCard>\`, or a generic \`<Icon />\` component. Use specific lucide-react icons instead (e.g. \`<Star />\`) with proper imports.
 - Either define helper components INSIDE the main function, or just use HTML elements with Tailwind
+
+${images && images.length > 0 ? `**IMAGE PLACEHOLDERS FROM THE SECTION (use these in your component — same order and layout as in the screenshot):**
+\`\`\`
+${images.map((img, i) => `${i + 1}. src="${img.src}"${img.alt ? ` alt="${img.alt.replace(/"/g, '\\"')}"` : ''}${img.width ? ` width=${img.width}` : ''}${img.height ? ` height=${img.height}` : ''}`).join('\n')}
+\`\`\`
+Use these exact \`src\` (and \`alt\` / \`width\` / \`height\` when provided) in your \`<img>\` elements.
+` : ''}
 
 **Context:**
 ${htmlContext ? `HTML Snippet:\n${htmlContext.slice(0, 8000)}...` : '(No HTML provided, rely 100% on screenshot)'}

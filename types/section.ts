@@ -9,6 +9,13 @@ export type SectionType =
     | 'contact'
     | 'unknown';
 
+export interface SectionImagePlaceholder {
+    src: string;
+    alt?: string;
+    width?: number;
+    height?: number;
+}
+
 export interface SectionMetadata {
     id: string;
     type: SectionType;
@@ -22,4 +29,6 @@ export interface SectionMetadata {
     screenshot?: string; // Base64 of just this section
     html?: string;
     text?: string;
+    /** Image placeholders from the section DOM for generated component placeholders */
+    images?: SectionImagePlaceholder[];
 }
