@@ -27,7 +27,7 @@ export default function CodeDisplay({ code }: CodeDisplayProps) {
                 }}
             >
                 <SandpackLayout className="!h-full !block">
-                    <div className="h-full overflow-hidden">
+                    <div className="h-full overflow-auto scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
                         <SandpackCodeEditor
                             showLineNumbers
                             showInlineErrors

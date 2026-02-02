@@ -13,7 +13,7 @@ export default function URLInput() {
     const router = useRouter();
 
     const handleAnalyze = async () => {
-        const { isValid, error } = validateUrl(url);
+        const { isValid, error, formattedUrl } = validateUrl(url);
         if (!isValid) {
             addToast(error || "Invalid URL", "error");
             return;
@@ -34,7 +34,7 @@ export default function URLInput() {
             addToast("URL verified! Starting analysis...", "success");
 
             // Navigate to generation page
-            router.push(`/generate?url=${encodeURIComponent(url)}`);
+            router.push(`/generate?url=${encodeURIComponent(formattedUrl || url)}`);
             // Keep loading state until navigation happens
             // setIsLoading(false);
         } catch (e) {

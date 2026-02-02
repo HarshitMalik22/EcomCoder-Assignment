@@ -126,6 +126,17 @@ function GeneratePageContent() {
         }
     };
 
+    const handleBack = () => {
+        if (step === 'preview') {
+            setStep('selecting');
+        } else if (step === 'generating') {
+            setStep('selecting');
+        } else {
+            // If detecting or selecting, go back home
+            window.location.href = '/';
+        }
+    };
+
     if (!url) {
         return <div className="p-10 text-center">No URL provided</div>;
     }
@@ -137,10 +148,13 @@ function GeneratePageContent() {
             <div className="max-w-7xl mx-auto space-y-8" suppressHydrationWarning>
                 {/* Header */}
                 <div className="flex items-center justify-between" suppressHydrationWarning>
-                    <Link href="/" className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors">
+                    <button
+                        onClick={handleBack}
+                        className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors"
+                    >
                         <ArrowLeft className="w-4 h-4" />
                         Back
-                    </Link>
+                    </button>
                     <h1 className="text-xl font-bold truncate max-w-md">{url}</h1>
                     <div className="w-20"></div>
                 </div>

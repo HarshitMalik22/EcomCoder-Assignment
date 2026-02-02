@@ -34,8 +34,8 @@ Your task is to analyze the provided website section (screenshot + HTML) and gen
 **Output Format:**
 - Return ONLY valid TypeScript React code.
 - Export default function.
-- DO NOT wrap the code in markdown blocks (e.g. \`\`\`tsx). Just return the raw code.
-- If you MUST use markdown blocks, ensure they are properly closed.
+- **MANDATORY**: Wrap the code in specific markdown blocks, e.g. \`\`\`tsx ... \`\`\`.
+- Do not include any conversational text outside the code block.
 `;
 
 export const generateUserPrompt = (type: string, htmlContext?: string) => `
