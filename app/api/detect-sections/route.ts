@@ -5,6 +5,7 @@ import { PlaywrightScraper } from '@/lib/scraper/playwright-scraper';
 import { validateUrl } from '@/lib/validators';
 import dns from 'dns/promises';
 import ipaddr from 'ipaddr.js';
+import { sanitizeErrorMessage } from '@/lib/errors/error-handler';
 
 export const maxDuration = 60; // 1 minute timeout
 
@@ -59,8 +60,9 @@ export async function POST(req: NextRequest) {
                 fullPageScreenshot = scrapeResult.fullPageScreenshot;
             } catch (error) {
                 console.error('Scraping failed during detection:', error);
+                const message = sanitizeErrorMessage((error as Error).message);
                 return NextResponse.json(
-                    { error: `Failed to scrape site: ${(error as Error).message}` },
+                    { error: message },
                     { status: 502 }
                 );
             }

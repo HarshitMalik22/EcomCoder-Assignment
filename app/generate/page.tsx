@@ -14,6 +14,7 @@ import { SectionMetadata } from '@/types/section';
 import { GeneratedComponent } from '@/types/generated-component';
 import { DeployButtons } from '@/components/DeployButtons';
 import { generateDownload } from '@/lib/export/file-generator';
+import ScrapeErrorModal from '@/components/ScrapeErrorModal';
 
 function GeneratePageContent() {
     const searchParams = useSearchParams();
@@ -29,6 +30,7 @@ function GeneratePageContent() {
     const [isRegenerating, setIsRegenerating] = useState(false);
     const [isCodePanelOpen, setIsCodePanelOpen] = useState(true);
     const [previewMode, setPreviewMode] = useState<'generated' | 'original'>('generated');
+    const [error, setError] = useState<string | null>(null);
     const { addToast } = useToast();
 
     // State Persistence
@@ -41,6 +43,7 @@ function GeneratePageContent() {
         if (forceRefresh) {
             sessionStorage.removeItem(STORAGE_KEY);
             setStep('detecting'); // Explicitly set detecting to show loader
+            setError(null);
         } else {
             // Try to restore first
             try {
@@ -76,7 +79,17 @@ function GeneratePageContent() {
 
             const data = await res.json();
 
-            if (!res.ok) throw new Error(data.error || "Failed to analyze page");
+            if (!res.ok) {
+                // Check if we already have some sections (partial failure)
+                if (data.data?.sections && data.data.sections.length > 0) {
+                    setSections(data.data.sections);
+                    setFullPageScreenshot(data.data.fullPageScreenshot);
+                    setStep('selecting');
+                    addToast(`Warning: Some parts failed, but found ${data.data.sections.length} sections`, 'info');
+                    return;
+                }
+                throw new Error(data.error || "Failed to analyze page");
+            }
 
             setSections(data.data.sections);
             setFullPageScreenshot(data.data.fullPageScreenshot);
@@ -85,28 +98,9 @@ function GeneratePageContent() {
         } catch (e) {
             const msg = (e as Error).message;
             addToast(msg === 'Aborted' ? 'Request timed out' : msg, 'error');
-            // If we are stuck in detecting, we should probably allow the user to try again or go back
-            // But we don't have a "failed" step. We'll send them back to home or stay in detecting but show a retry button?
-            // Better: Redirect to home or show error state.
-            // Since we are inside the page, let's just push back to home if it was specific error, or let user click back.
-            // But 'detecting' view is just a loader. We need to get out of it.
-            if (step === 'detecting') {
-                // Determine if this was a critical failure
-                // Force user back to inputs often annoying, but hanging is worse.
-                // Let's go to a valid state or error view.
-                // Resetting to 'detecting' is bad.
-                // Let's redirect to home with error query param?
-                // Or just show toast and let them click "Back" (which is rendered in header)
-                // Actually the header is visible in detect mode? Checks render...
-                // Yes, header is visible. But main content is just loader.
-                // If we stay in 'detecting' but toast error, it's still spinning.
-                // Let's add an 'error' step or just handle it.
-                // For now, I'll set step to 'selecting' but with empty sections so they see the empty state? 
-                // Or better, just go back to home.
-                // window.location.href = '/?error=' + encodeURIComponent(msg);
-            }
+            setError(msg === 'Aborted' ? 'Request timed out' : msg);
         }
-    }, [url, addToast, STORAGE_KEY, step]);
+    }, [url, addToast, STORAGE_KEY]);
 
     // Initial load
     useEffect(() => {
@@ -147,6 +141,7 @@ function GeneratePageContent() {
     const handleGenerate = async (ids: string[]) => {
         setSelectedIds(ids);
         setStep('generating');
+        setError(null);
 
         try {
             const promises = ids.map(async (id) => {
@@ -179,7 +174,9 @@ function GeneratePageContent() {
                 throw new Error("No components were generated.");
             }
         } catch (e) {
-            addToast((e as Error).message || "Failed to generate components", 'error');
+            const msg = (e as Error).message || "Failed to generate components";
+            addToast(msg, 'error');
+            setError(msg);
             setStep('selecting'); // Go back to selection on error
         }
     };
@@ -524,6 +521,20 @@ function GeneratePageContent() {
                     </div>
                 )}
             </div>
+
+            {/* Error Display Modal */}
+            {error && (
+                <ScrapeErrorModal
+                    error={error}
+                    onRetry={() => {
+                        setError(null);
+                        if (step === 'detecting') detectSections(true);
+                        else if (step === 'generating') handleGenerate(selectedIds);
+                        else detectSections(true);
+                    }}
+                    onBack={() => window.location.href = '/'}
+                />
+            )}
         </div>
     );
 }

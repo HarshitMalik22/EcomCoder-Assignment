@@ -49,3 +49,45 @@ export function handleError(error: unknown): AppError {
 
     return new AppError('An unknown error occurred', 'UNKNOWN_ERROR', 500, { originalError: error });
 }
+
+export function sanitizeErrorMessage(message: string): string {
+    if (!message) return 'An unknown error occurred';
+
+    const lowerMessage = message.toLowerCase();
+
+    // Playwright/Automation specific errors
+    if (lowerMessage.includes('page.screenshot') || lowerMessage.includes('locator.screenshot')) {
+        return 'Failed to capture page layout. The site might have strong bot protection (like Cloudflare) or is too complex to render.';
+    }
+
+    if (lowerMessage.includes('page.goto') || lowerMessage.includes('timeout')) {
+        return 'The website took too long to load. This can happen if the site is slow or blocking automated scanning.';
+    }
+
+    if (lowerMessage.includes('err_name_not_resolved')) {
+        return 'We couldn\'t find that website. Please check if the URL is correct.';
+    }
+
+    if (lowerMessage.includes('browser was closed') || lowerMessage.includes('target closed')) {
+        return 'The connection to the browser was interrupted. Please try again.';
+    }
+
+    // Generic Playwright internal details cleanup
+    if (message.includes('==========')) {
+        return message.split('==========')[0].trim() || 'Scraping failed during browser execution.';
+    }
+
+    // Capture the first readable line if it's a multi-line technical log
+    const lines = message.split('\n');
+    if (lines.length > 1 && lines[0].length < 10) {
+        // Sometimes the first line is just "Error:"
+        return lines[1].trim();
+    }
+
+    // Final limit
+    if (message.length > 300) {
+        return message.substring(0, 300) + '...';
+    }
+
+    return message;
+}

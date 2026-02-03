@@ -4,6 +4,7 @@ import { scrapeUrl } from '@/lib/scraper';
 import { validateUrl } from '@/lib/validators';
 import dns from 'dns/promises';
 import ipaddr from 'ipaddr.js';
+import { sanitizeErrorMessage } from '@/lib/errors/error-handler';
 
 export async function POST(req: Request) {
     try {
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json(
-            { error: error.message || 'Internal Server Error' },
+            { error: sanitizeErrorMessage(error.message) },
             { status: 500 }
         );
     }
