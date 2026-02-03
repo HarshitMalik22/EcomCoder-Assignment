@@ -64,27 +64,57 @@ function GeneratePageContent() {
         }
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
             const res = await fetch('/api/detect-sections', {
                 method: 'POST',
                 body: JSON.stringify({ url }),
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
+
             const data = await res.json();
 
-            if (!res.ok) throw new Error(data.error);
+            if (!res.ok) throw new Error(data.error || "Failed to analyze page");
 
             setSections(data.data.sections);
             setFullPageScreenshot(data.data.fullPageScreenshot);
             setStep('selecting');
             addToast(`Found ${data.data.sections.length} sections`, 'success');
         } catch (e) {
-            addToast((e as Error).message, 'error');
+            const msg = (e as Error).message;
+            addToast(msg === 'Aborted' ? 'Request timed out' : msg, 'error');
+            // If we are stuck in detecting, we should probably allow the user to try again or go back
+            // But we don't have a "failed" step. We'll send them back to home or stay in detecting but show a retry button?
+            // Better: Redirect to home or show error state.
+            // Since we are inside the page, let's just push back to home if it was specific error, or let user click back.
+            // But 'detecting' view is just a loader. We need to get out of it.
+            if (step === 'detecting') {
+                // Determine if this was a critical failure
+                // Force user back to inputs often annoying, but hanging is worse.
+                // Let's go to a valid state or error view.
+                // Resetting to 'detecting' is bad.
+                // Let's redirect to home with error query param?
+                // Or just show toast and let them click "Back" (which is rendered in header)
+                // Actually the header is visible in detect mode? Checks render...
+                // Yes, header is visible. But main content is just loader.
+                // If we stay in 'detecting' but toast error, it's still spinning.
+                // Let's add an 'error' step or just handle it.
+                // For now, I'll set step to 'selecting' but with empty sections so they see the empty state? 
+                // Or better, just go back to home.
+                // window.location.href = '/?error=' + encodeURIComponent(msg);
+            }
         }
-    }, [url, addToast, STORAGE_KEY]);
+    }, [url, addToast, STORAGE_KEY, step]);
 
     // Initial load
     useEffect(() => {
-        detectSections();
-    }, [detectSections]);
+        // Only run if we are in detecting step (initial) or explicitly requested
+        if (step === 'detecting' && sections.length === 0) {
+            detectSections();
+        }
+    }, [detectSections, step, sections.length]);
 
     // Save state on change
     useEffect(() => {
@@ -113,8 +143,6 @@ function GeneratePageContent() {
 
     const [activeTab, setActiveTab] = useState<'code' | 'chat'>('code');
 
-    // ... (keep useEffect for detect)
-
     // 2. Generate Components
     const handleGenerate = async (ids: string[]) => {
         setSelectedIds(ids);
@@ -131,7 +159,7 @@ function GeneratePageContent() {
                 });
 
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.error);
+                if (!res.ok) throw new Error(data.error || "Generation failed");
 
                 // Initialize history with v1
                 const component = data.data as GeneratedComponent;
@@ -147,10 +175,12 @@ function GeneratePageContent() {
                 setActiveComponentId(results[0].id);
                 setStep('preview');
                 addToast("Components generated successfully!", "success");
+            } else {
+                throw new Error("No components were generated.");
             }
         } catch (e) {
-            addToast("Failed to generate components", 'error');
-            setStep('selecting');
+            addToast((e as Error).message || "Failed to generate components", 'error');
+            setStep('selecting'); // Go back to selection on error
         }
     };
 

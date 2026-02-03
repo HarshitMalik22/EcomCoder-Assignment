@@ -1,6 +1,6 @@
 # AI Prompt Strategy
 
-LevelUp relies on carefully engineered prompts to ensure high-quality code generation using **Google Gemini**.
+Website2Code relies on carefully engineered prompts to ensure high-quality code generation using **Google Gemini**.
 
 ## Component Generation Prompt
 

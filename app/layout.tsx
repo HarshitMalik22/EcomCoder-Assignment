@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LevelUp - AI Component Generator",
+  title: "Website2Code - AI Component Generator",
   description: "Transform website sections into modern React components instantly.",
 };
 

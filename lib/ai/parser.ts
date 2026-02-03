@@ -165,6 +165,7 @@ function normalizeGenericIcons(code: string): string {
     return normalized;
 }
 
+
 /**
  * Detects undefined custom components in the JSX
  */
@@ -184,13 +185,14 @@ function detectUndefinedComponents(code: string): string[] {
 
     // Get the function body to check for locally defined components
     const functionBodyMatch = code.match(/export\s+default\s+function\s+\w+\s*\([^)]*\)\s*\{([\s\S]*)\}/);
-    const functionBody = functionBodyMatch ? functionBodyMatch[1] : '';
+    // Also check for standard function definitions or const exports
+    const allContent = code;
 
     // Find locally defined components (const ComponentName = ...)
-    const localComponentRegex = /(?:const|let|var|function)\s+([A-Z][a-zA-Z0-9]*)\s*=/g;
+    const localComponentRegex = /(?:const|let|var|function)\s+([A-Z][a-zA-Z0-9]*)\s*(?:=|:|\()/g;
     const localComponents = new Set<string>();
     let localMatch;
-    while ((localMatch = localComponentRegex.exec(code)) !== null) {
+    while ((localMatch = localComponentRegex.exec(allContent)) !== null) {
         localComponents.add(localMatch[1]);
     }
 
@@ -199,6 +201,9 @@ function detectUndefinedComponents(code: string): string[] {
     if (mainFunctionMatch) {
         localComponents.add(mainFunctionMatch[1]);
     }
+
+    // Reset regex index
+    jsxTagRegex.lastIndex = 0;
 
     while ((match = jsxTagRegex.exec(code)) !== null) {
         const componentName = match[1];
@@ -250,7 +255,7 @@ function validateCode(code: string): { isValid: boolean; errors: string[]; warni
     // Check for undefined custom components
     const undefinedComponents = detectUndefinedComponents(code);
     if (undefinedComponents.length > 0) {
-        errors.push(`Code uses undefined components: ${undefinedComponents.join(', ')}. These must be defined within the file or replaced with HTML elements.`);
+        warnings.push(`Code uses undefined components: ${undefinedComponents.join(', ')}. These have been auto-stubbed to prevent crashes.`);
     }
 
     return {
@@ -258,6 +263,39 @@ function validateCode(code: string): { isValid: boolean; errors: string[]; warni
         errors,
         warnings
     };
+}
+
+/**
+ * Automatically adds dummy definitions for undefined components to prevent runtime errors.
+ */
+function stubUndefinedComponents(code: string): string {
+    const undefinedComponents = detectUndefinedComponents(code);
+
+    if (undefinedComponents.length === 0) return code;
+
+    let stubbedCode = code;
+    const stubs = undefinedComponents.map(name => {
+        return `const ${name} = ({ children, ...props }: any) => (
+  <div {...props} className="p-4 border border-dashed border-red-400 rounded bg-red-50/10 text-red-400 text-xs">
+    Running stub for: <strong>${name}</strong> (AI failed to define this)
+    {children}
+  </div>
+);`;
+    }).join('\n\n');
+
+    // Insert stubs before the last closing brace or at the end of imports
+    // Best place is usually before the export default, or at the top after imports.
+    // Let's place them after imports.
+
+    const lastImportIndex = stubbedCode.lastIndexOf('import ');
+    if (lastImportIndex !== -1) {
+        const endOfImports = stubbedCode.indexOf('\n', lastImportIndex);
+        stubbedCode = stubbedCode.slice(0, endOfImports + 1) + '\n// Auto-generated stubs for missing components\n' + stubs + '\n' + stubbedCode.slice(endOfImports + 1);
+    } else {
+        stubbedCode = stubs + '\n\n' + stubbedCode;
+    }
+
+    return stubbedCode;
 }
 
 export function parseGeneratedCode(response: string): string {
@@ -292,10 +330,14 @@ export function parseGeneratedCode(response: string): string {
     // Normalize common generic icon patterns (e.g., <Icon />) to concrete lucide icons
     code = normalizeGenericIcons(code);
 
+    // Auto-stub undefined components (CRITICAL FIX for "Element type is invalid")
+    code = stubUndefinedComponents(code);
+
     // Validate the code
     const validation = validateCode(code);
     if (!validation.isValid) {
         console.warn('Code validation errors:', validation.errors);
+        // We could throw here, but let's try to return what we have so the user sees the error in the editor
     }
     if (validation.warnings.length > 0) {
         console.warn('Code validation warnings:', validation.warnings);
@@ -303,4 +345,5 @@ export function parseGeneratedCode(response: string): string {
 
     return code.trim();
 }
+
 

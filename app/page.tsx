@@ -70,7 +70,7 @@ export default function Home() {
       </div>
 
       <footer className="mt-20 py-8 text-center text-zinc-600 text-sm">
-        <p>&copy; {currentYear ?? "2026"} LevelUp. Built with Next.js & Tailwind.</p>
+        <p>&copy; {currentYear ?? "2026"} Website2Code. Built with Next.js & Tailwind.</p>
       </footer>
     </main>
   );

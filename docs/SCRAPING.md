@@ -1,6 +1,6 @@
 # Scraping Strategy & Limitations
 
-LevelUp uses a highly optimized **Playwright** engine designed for stealth and visual fidelity.
+Website2Code uses a highly optimized **Playwright** engine designed for stealth and visual fidelity.
 
 ## Architecture
 
