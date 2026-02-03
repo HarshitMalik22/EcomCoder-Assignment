@@ -70,7 +70,7 @@ async function dismissCookieBannerForScreenshot(page: Page): Promise<void> {
         for (const selector of declineSelectors) {
             const btn = page.locator(selector).first();
             if ((await btn.count()) > 0) {
-                await btn.click({ timeout: 2000 }).catch(() => {});
+                await btn.click({ timeout: 2000 }).catch(() => { });
                 await page.waitForTimeout(400);
                 return;
             }
@@ -131,28 +131,41 @@ export class PlaywrightScraper {
     private browser: Browser | null = null;
 
     async scrape(url: string, options: ScrapeOptions = { url }): Promise<ScrapedPageResult> {
-        this.browser = await chromium.launch({
-            headless: true,
-            args: [
-                '--disable-blink-features=AutomationControlled',
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-infobars',
-                '--window-position=0,0',
-                '--ignore-certificate-errors',
-                '--ignore-certificate-errors-spki-list',
-                '--disable-gpu',
-                '--disable-software-rasterizer',
-                '--disable-extensions',
-                '--disable-background-networking',
-                '--disable-sync',
-                '--disable-default-apps',
-                '--mute-audio',
-                '--no-first-run',
-            ],
-            timeout: 30000,
-        });
+        // Use remote browser service in production (Vercel), local browser in development
+        const browserWSEndpoint = process.env.BROWSER_WS_ENDPOINT;
+
+        if (browserWSEndpoint) {
+            // Connect to remote browser service (e.g., Browserless.io)
+            console.log('Connecting to remote browser service...');
+            this.browser = await chromium.connectOverCDP(browserWSEndpoint, {
+                timeout: 30000,
+            });
+        } else {
+            // Local development: launch local browser
+            console.log('Launching local browser...');
+            this.browser = await chromium.launch({
+                headless: true,
+                args: [
+                    '--disable-blink-features=AutomationControlled',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-infobars',
+                    '--window-position=0,0',
+                    '--ignore-certificate-errors',
+                    '--ignore-certificate-errors-spki-list',
+                    '--disable-gpu',
+                    '--disable-software-rasterizer',
+                    '--disable-extensions',
+                    '--disable-background-networking',
+                    '--disable-sync',
+                    '--disable-default-apps',
+                    '--mute-audio',
+                    '--no-first-run',
+                ],
+                timeout: 30000,
+            });
+        }
 
         const context = await this.browser.newContext({
             viewport: { width: 1920, height: 1080 },
@@ -189,7 +202,7 @@ export class PlaywrightScraper {
             try {
                 await page.waitForLoadState('networkidle', { timeout: 8000 });
             } catch {
-                await page.waitForLoadState('load', { timeout: 5000 }).catch(() => {});
+                await page.waitForLoadState('load', { timeout: 5000 }).catch(() => { });
             }
 
             await page.waitForTimeout(800);

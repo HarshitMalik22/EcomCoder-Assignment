@@ -1,8 +1,16 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import URLInput from "@/components/URLInput";
 import { Highlighter } from "@/components/ui/highlighter";
 import { Code2, Copy, Layers } from "lucide-react";
 
 export default function Home() {
+  const [currentYear, setCurrentYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center p-4 overflow-hidden">
       {/* Background Effects */}
@@ -62,7 +70,7 @@ export default function Home() {
       </div>
 
       <footer className="mt-20 py-8 text-center text-zinc-600 text-sm">
-        <p>&copy; {new Date().getFullYear()} LevelUp. Built with Next.js & Tailwind.</p>
+        <p>&copy; {currentYear ?? "2026"} LevelUp. Built with Next.js & Tailwind.</p>
       </footer>
     </main>
   );

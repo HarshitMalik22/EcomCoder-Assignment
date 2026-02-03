@@ -4,10 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx playwright install chromium && next build",
+    "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "postinstall": "playwright install chromium"
+    "lint": "eslint"
   },
   "dependencies": {
     "@codesandbox/sandpack-react": "^2.20.0",
