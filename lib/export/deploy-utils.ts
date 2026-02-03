@@ -1,7 +1,6 @@
 import { GeneratedComponent } from "@/types/generated-component";
 import { getDeploymentDependencies } from "@/lib/preview/sandbox";
 import sdk from "@stackblitz/sdk";
-import LZString from "lz-string";
 
 type ToastFunction = (message: string, type: 'success' | 'error' | 'info') => void;
 
@@ -133,26 +132,6 @@ body {
   },
 }`;
 
-    // .codesandbox/tasks.json
-    const tasksJson = {
-        "setupTasks": [
-            {
-                "name": "Install dependencies",
-                "command": "npm install"
-            }
-        ],
-        "tasks": {
-            "dev": {
-                "name": "dev",
-                "command": "npm run dev",
-                "runAtStart": true,
-                "preview": {
-                    "port": 5173
-                }
-            }
-        }
-    };
-
     return {
         "package.json": JSON.stringify(packageJson, null, 2),
         "vite.config.ts": viteConfig,
@@ -163,69 +142,8 @@ body {
         "src/index.css": indexCss,
         "src/App.tsx": appTsx,
         "tsconfig.json": JSON.stringify(tsConfig, null, 2),
-        "tsconfig.node.json": JSON.stringify(tsConfigNode, null, 2),
-        ".codesandbox/tasks.json": JSON.stringify(tasksJson, null, 2)
+        "tsconfig.node.json": JSON.stringify(tsConfigNode, null, 2)
     };
-}
-
-function compressParameters(parameters: any) {
-    return LZString.compressToBase64(JSON.stringify(parameters))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-}
-
-export async function deployToCodeSandbox(component: GeneratedComponent, toast: ToastFunction) {
-    try {
-        const files = generateProjectFiles(component);
-
-        // CodeSandbox Define API mapping for Vite structure
-        const parameters = {
-            files: {
-                "package.json": { content: files["package.json"] },
-                "vite.config.ts": { content: files["vite.config.ts"] },
-                "tailwind.config.js": { content: files["tailwind.config.js"] },
-                "postcss.config.js": { content: files["postcss.config.js"] },
-                "index.html": { content: files["index.html"] },
-                "src/main.tsx": { content: files["src/main.tsx"] },
-                "src/index.css": { content: files["src/index.css"] },
-                "src/App.tsx": { content: files["src/App.tsx"] },
-                "tsconfig.json": { content: files["tsconfig.json"] },
-                "tsconfig.node.json": { content: files["tsconfig.node.json"] },
-                ".codesandbox/tasks.json": { content: files[".codesandbox/tasks.json"] }
-            },
-            template: "node"
-        };
-
-        const compressedParameters = compressParameters(parameters);
-
-        const response = await fetch("https://codesandbox.io/api/v1/sandboxes/define?json=1", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            },
-            body: JSON.stringify({ parameters: compressedParameters })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Failed to create sandbox: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        const sandboxId = data.sandbox_id;
-
-        if (sandboxId) {
-            window.open(`https://codesandbox.io/s/${sandboxId}`, "_blank");
-            toast("Deployed to CodeSandbox!", "success");
-        } else {
-            throw new Error("No sandbox ID received");
-        }
-
-    } catch (error) {
-        console.error("CodeSandbox deployment error:", error);
-        toast("Failed to deploy to CodeSandbox", "error");
-    }
 }
 
 export async function deployToStackBlitz(component: GeneratedComponent, toast: ToastFunction) {

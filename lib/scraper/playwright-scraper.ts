@@ -98,37 +98,31 @@ async function dismissCookieBannerForScreenshot(page: Page): Promise<void> {
     }
 }
 
-/**
- * Block cookies: strip Set-Cookie from document responses so we never store cookies.
- * We do not accept cookie banners or consent – no cookies are requested or stored.
- * Only document requests are intercepted to keep scraping fast.
- */
-async function blockCookies(page: Page): Promise<void> {
-    await page.route('**/*', async (route) => {
-        if (route.request().resourceType() !== 'document') {
-            await route.continue();
-            return;
-        }
-        const response = await route.fetch().catch(() => null);
-        if (!response) {
-            await route.abort();
-            return;
-        }
-        const raw = response.headers();
-        const headers: Record<string, string> = {};
-        for (const name of Object.keys(raw)) {
-            if (name.toLowerCase() !== 'set-cookie') headers[name] = raw[name];
-        }
-        await route.fulfill({
-            status: response.status(),
-            headers,
-            body: await response.body(),
-        });
-    });
-}
+
 
 export class PlaywrightScraper {
     private browser: Browser | null = null;
+
+    private async autoScroll(page: Page): Promise<void> {
+        await page.evaluate(async () => {
+            await new Promise<void>((resolve) => {
+                let totalHeight = 0;
+                const distance = 100;
+                const delay = 100;
+
+                const timer = setInterval(() => {
+                    const scrollHeight = document.body.scrollHeight;
+                    window.scrollBy(0, distance);
+                    totalHeight += distance;
+
+                    if (totalHeight >= scrollHeight - window.innerHeight) {
+                        clearInterval(timer);
+                        resolve();
+                    }
+                }, delay);
+            });
+        });
+    }
 
     async scrape(url: string, options: ScrapeOptions = { url }): Promise<ScrapedPageResult> {
         // Use remote browser service in production (Vercel), local browser in development
@@ -174,6 +168,7 @@ export class PlaywrightScraper {
             timezoneId: 'America/New_York',
             ignoreHTTPSErrors: true,
             javaScriptEnabled: true,
+            deviceScaleFactor: 1,
         });
 
         await context.clearCookies();
@@ -182,43 +177,46 @@ export class PlaywrightScraper {
 
         try {
             await applyStealthScripts(page);
+            // Relaxed cookie blocking: We simply clear cookies at start. 
+            // Intercepting headers caused Next.js hydration crashes on some sites.
 
-            // Block cookies: strip Set-Cookie from all responses – we never store or accept cookies
-            await blockCookies(page);
-
+            // Allow normal headers to look more like a real user
             await page.setExtraHTTPHeaders({
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.9',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-User': '?1',
             });
 
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
 
-            // Light scroll to trigger lazy content
-            await page.mouse.wheel(0, 300);
-
+            // Robust Auto-Scroll
             try {
-                await page.waitForLoadState('networkidle', { timeout: 8000 });
-            } catch {
-                await page.waitForLoadState('load', { timeout: 5000 }).catch(() => { });
+                await this.autoScroll(page);
+            } catch (e) {
+                console.warn('Auto-scroll failed or timed out, continuing...', e);
             }
 
-            await page.waitForTimeout(800);
+            try {
+                await page.waitForLoadState('networkidle', { timeout: 6000 });
+            } catch {
+                await page.waitForLoadState('load', { timeout: 4000 }).catch(() => { });
+            }
+            await page.waitForTimeout(1000);
 
             await dismissCookieBannerForScreenshot(page);
-            await page.waitForTimeout(300);
+            await page.waitForTimeout(500);
 
             const title = await page.title();
 
             let fullPageScreenshot: string | undefined;
             if (options.includeScreenshots) {
-                const buffer = await page.screenshot({ fullPage: true, type: 'jpeg', quality: 50 });
-                fullPageScreenshot = buffer.toString('base64');
+                try {
+                    const buffer = await page.screenshot({ fullPage: true, type: 'jpeg', quality: 50 });
+                    fullPageScreenshot = buffer.toString('base64');
+                } catch (e) {
+                    console.warn('Full page screenshot failed:', e);
+                }
             }
 
-            // Client-side identification phase (Your existing logic)
+            // Client-side identification phase
             const rawSections = await page.evaluate(() => {
                 const getSelector = (el: Element): string => {
                     if (el.id) return `#${el.id}`;
@@ -230,12 +228,12 @@ export class PlaywrightScraper {
 
                 const cleanHtml = (element: Element) => {
                     const clone = element.cloneNode(true) as Element;
-                    const removables = clone.querySelectorAll('script, style, iframe, noscript, svg');
+                    const removables = clone.querySelectorAll('script, style, iframe, noscript, svg, [aria-hidden="true"]');
                     removables.forEach(el => el.remove());
                     const allElements = clone.querySelectorAll('*');
                     allElements.forEach(el => {
                         Array.from(el.attributes).forEach(attr => {
-                            if (attr.name.startsWith('on') || attr.name.startsWith('data-')) {
+                            if (attr.name.startsWith('on') || attr.name.startsWith('data-') || attr.name === 'class') {
                                 el.removeAttribute(attr.name);
                             }
                         });
@@ -243,67 +241,182 @@ export class PlaywrightScraper {
                     return clone.outerHTML;
                 };
 
-                const structuralSelectors = ['header', 'footer', 'nav', 'main', 'aside', 'section'];
+                const structuralSelectors = ['header', 'footer', 'nav', 'main', 'aside', 'section', 'article'];
+                // Expanded selectors for modern frameworks
                 const layoutSelectors = [
                     '[role="banner"]', '[role="main"]', '[role="contentinfo"]',
                     'main > *',
-                    'body > div:not(#__next):not(#root)',
+                    '#__next > *', '#root > *', '#app > *',
+                    'body > div:not(#__next):not(#root):not(#app)',
+                    // Common useful classes
+                    '.section', '.container', '.wrapper', '.content'
                 ];
 
                 const candidates = Array.from(document.querySelectorAll([...structuralSelectors, ...layoutSelectors].join(', ')));
-                let uniqueCandidates = Array.from(new Set(candidates)) as HTMLElement[];
 
-                uniqueCandidates = uniqueCandidates.filter(el => {
+                // Helper: Check if element is "visually significant"
+                const isVisuallySignificant = (el: Element, strict = true) => {
                     const rect = el.getBoundingClientRect();
                     const style = window.getComputedStyle(el);
+
                     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
-                    if (rect.width < 100 || rect.height < 50) return false;
+                    if (rect.width < 50 || rect.height < 50) return false;
+
+                    // Must have some content or be a container
+                    if (el.textContent?.trim().length === 0 && el.children.length === 0) return false;
+
+                    return true;
+                };
+
+                let meaningfulSections: HTMLElement[] = [];
+                const processed = new Set<HTMLElement>();
+
+                // --- RECURSIVE FLATTENER ---
+                // Identify the "real" layout nodes by effectively removing wrappers.
+                // A wrapper is defined as an element that:
+                // 1. Has only 1 significant child.
+                // 2. OR has multiple children, but they are just tiny spacers + 1 main child.
+                // 3. OR is the functionality same size as its child.
+
+                const flattenTree = (element: HTMLElement, depth: number): HTMLElement[] => {
+                    if (depth > 20) return [element]; // Safety break
+
+                    const children = Array.from(element.children) as HTMLElement[];
+                    const validChildren = children.filter(child => isVisuallySignificant(child));
+
+                    // CASE 1: Single Child Wrapper -> Drill down
+                    if (validChildren.length === 1) {
+                        const child = validChildren[0];
+                        // If child is basically same size as parent, or parent is just a transparent box
+                        return flattenTree(child, depth + 1);
+                    }
+
+                    // CASE 2: Multi-child Layout (Grid/Flex) -> This IS the layout level
+                    if (validChildren.length > 1) {
+                        // Check if these children are actually parts of a single logical section (e.g. Header + subheader)
+                        // OR if they are distinct major sections (Header, Hero, Footer)
+
+                        // Heuristic: If this element covers the whole viewport height, it's likely a Page Wrapper, not a Section.
+                        // We want to return the CHILDREN as the sections.
+                        const rect = element.getBoundingClientRect();
+                        const viewportHeight = window.innerHeight;
+
+                        // If element is Huge (height > 80% viewport) AND has multiple valid children, 
+                        // it's likely a container of sections. Return children.
+                        if (rect.height > viewportHeight * 0.8) {
+                            let flatChildren: HTMLElement[] = [];
+                            validChildren.forEach(vc => {
+                                flatChildren = flatChildren.concat(flattenTree(vc, depth + 1));
+                            });
+                            return flatChildren;
+                        }
+
+                        // Otherwise, this element itself might be a "Section" (e.g. a Card Grid)
+                        // BUT, if we are at the top level (Body/Root), we ALWAYS want children.
+                        const isRoot = ['BODY', 'MAIN', '__next', 'root', 'app'].some(s => element.id === s || element.tagName === s);
+                        if (isRoot) {
+                            let flatChildren: HTMLElement[] = [];
+                            validChildren.forEach(vc => {
+                                flatChildren = flatChildren.concat(flattenTree(vc, depth + 1));
+                            });
+                            return flatChildren;
+                        }
+
+                        // If it's a generic div but looks like a Section (has heading, manageable height), keep it.
+                        return [element];
+                    }
+
+                    // CASE 3: No valid children (Leaf node with text/content) -> This is a Section
+                    return [element];
+                };
+
+                // Start strict search from known roots
+                const roots = Array.from(document.querySelectorAll('body, #__next, #root, #app, main'));
+                // Sort roots by specificity (prefer #__next/#root over body)
+                roots.sort((a, b) => {
+                    const score = (id: string) => ['__next', 'root', 'app'].some(s => id.includes(s)) ? 2 : 1;
+                    return score(b.id) - score(a.id);
+                });
+
+                const primaryRoot = roots.find(r => r.id === '__next' || r.id === 'root' || r.id === 'app') || document.body;
+
+                // Initial Flattening
+                meaningfulSections = flattenTree(primaryRoot as HTMLElement, 0);
+
+                // --- POST-FILTERING ---
+                // Now we have a list of potential sections. Filter out garbage.
+                meaningfulSections = meaningfulSections.filter(el => {
+                    // 1. Visually significant
+                    if (!isVisuallySignificant(el)) return false;
+
+                    const rect = el.getBoundingClientRect();
+                    // 2. Not too thin (e.g. horizontal rules, tiny spacers)
+                    if (rect.height < 50) return false;
+
+                    // 3. Not full-screen overlays (unless they are the only content)
+                    // (This helps avoid modals obscuring content, though we might want them?)
+                    const style = window.getComputedStyle(el);
+                    if (style.position === 'fixed' && style.zIndex !== 'auto' && parseInt(style.zIndex) > 100) return false;
+
+                    // 4. Must contain SOME textual content or an image
+                    const hasText = el.innerText.trim().length > 0;
+                    const hasImg = el.querySelector('img') !== null;
+                    if (!hasText && !hasImg) return false;
+
+                    // 5. Exclude nested duplicates. 
+                    // The recursive flatten should have handled this, but safety check:
+                    // We actually WANT the deepest significant nodes, so if A contains B, and both are in list,
+                    // it means our flattener decided both were distinct blocks? 
+                    // Actually, flattener returns leaves or block-containers. They shouldn't overlap strictly.
                     return true;
                 });
 
-                const finalElements: HTMLElement[] = [];
-                const discardSet = new Set<HTMLElement>();
+                // --- DEDUPLICATION (Just in case) ---
+                // If Section A contains Section B, and B covers > 80% of A, discard A.
+                const finalSections: HTMLElement[] = [];
+                meaningfulSections.sort((a, b) => b.getBoundingClientRect().width * b.getBoundingClientRect().height - a.getBoundingClientRect().width * a.getBoundingClientRect().height); // larger first
 
-                for (let i = 0; i < uniqueCandidates.length; i++) {
-                    const outer = uniqueCandidates[i];
-                    if (discardSet.has(outer)) continue;
-
-                    for (let j = 0; j < uniqueCandidates.length; j++) {
-                        if (i === j) continue;
-                        const inner = uniqueCandidates[j];
-                        if (discardSet.has(inner)) continue;
-
-                        if (outer.contains(inner)) {
-                            const outerRect = outer.getBoundingClientRect();
-                            const innerRect = inner.getBoundingClientRect();
-                            const outerArea = outerRect.width * outerRect.height;
-                            const innerArea = innerRect.width * innerRect.height;
-
-                            if (outer.tagName === 'MAIN' || outer.tagName === 'BODY') {
-                                discardSet.add(outer);
-                            }
-                            else {
-                                if (innerArea / outerArea > 0.7) {
-                                    discardSet.add(inner);
-                                }
+                for (const candidate of meaningfulSections) {
+                    let kept = true;
+                    for (const existing of finalSections) {
+                        if (existing.contains(candidate)) {
+                            // Candidate is inside an existing section. 
+                            // Usually we want the OUTER one if we decided to stop there.
+                            // BUT, if the outer one was "too big" we might want inner. 
+                            // With our new logic, if we returned both, it's a bug in flatten. 
+                            // Let's assume larger is better if they are truly distinct sections?
+                            // No, usually finer grain is better for "Components".
+                            // Let's skip candidate if it's already covered.
+                            kept = false;
+                            break;
+                        }
+                        if (candidate.contains(existing)) {
+                            // Candidate contains existing.
+                            // If candidate is just a wrapper, we prefer existing.
+                            const cRect = candidate.getBoundingClientRect();
+                            const eRect = existing.getBoundingClientRect();
+                            if ((eRect.width * eRect.height) / (cRect.width * cRect.height) > 0.6) {
+                                // Existing is > 60% of Candidate. Prefer inner existing.
+                                kept = false;
+                                break;
                             }
                         }
                     }
+                    if (kept) finalSections.push(candidate);
                 }
+
+                meaningfulSections = finalSections;
 
                 const results: any[] = [];
                 let counter = 0;
 
-                uniqueCandidates.sort((a, b) => {
-                    const rectA = a.getBoundingClientRect();
-                    const rectB = b.getBoundingClientRect();
-                    return rectA.y - rectB.y;
+                // Sort visually (Top to Bottom)
+                meaningfulSections.sort((a, b) => {
+                    return a.getBoundingClientRect().y - b.getBoundingClientRect().y;
                 });
 
-                for (const el of uniqueCandidates) {
-                    if (discardSet.has(el)) continue;
+                for (const el of meaningfulSections) {
                     const rect = el.getBoundingClientRect();
-                    if (rect.height > document.documentElement.scrollHeight * 0.9) continue;
 
                     const uniqueId = `scraped-section-${counter++}`;
                     el.setAttribute('data-scraped-id', uniqueId);
@@ -386,6 +499,7 @@ export class PlaywrightScraper {
         }
     }
 }
+
 
 export const playwrightScraper = new PlaywrightScraper();
 
