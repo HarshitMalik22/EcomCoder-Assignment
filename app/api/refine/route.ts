@@ -13,8 +13,7 @@ export async function POST(req: NextRequest) {
 
         const newCode = await refineComponent({
             currentCode: body.code,
-            instruction: body.instruction,
-            model: body.model || 'claude'
+            instruction: body.instruction
         });
 
         return NextResponse.json({

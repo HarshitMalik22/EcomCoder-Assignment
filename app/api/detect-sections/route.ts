@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SectionDetector } from '@/lib/section-detector';
 import { ScrapedSection } from '@/types/scraper';
 import { PlaywrightScraper } from '@/lib/scraper/playwright-scraper';
+import { validateUrl } from '@/lib/validators';
+import dns from 'dns/promises';
+import ipaddr from 'ipaddr.js';
 
 export const maxDuration = 60; // 1 minute timeout
 
@@ -15,19 +18,33 @@ export async function POST(req: NextRequest) {
 
         if (url && (!sections || sections.length === 0)) {
             // Validate URL before scraping
+            const validation = validateUrl(url);
+            if (!validation.isValid) {
+                return NextResponse.json({ error: validation.error }, { status: 400 });
+            }
+            url = validation.formattedUrl; // Ensure we use the formatted URL
+
+            // Advanced SSRF Protection: DNS Resolution
             try {
-                const parsedUrl = new URL(url);
-                if (!parsedUrl.hostname.includes('.') && parsedUrl.hostname !== 'localhost') {
-                    return NextResponse.json(
-                        { error: `Invalid domain "${parsedUrl.hostname}". Please enter a complete URL like "${parsedUrl.hostname}.com"` },
-                        { status: 400 }
-                    );
+                const parsed = new URL(url);
+                const hostname = parsed.hostname;
+
+                // Resolve DNS
+                const { address } = await dns.lookup(hostname);
+
+                // Check resolved IP
+                if (ipaddr.isValid(address)) {
+                    // @ts-ignore
+                    const addr = ipaddr.parse(address);
+                    // @ts-ignore
+                    const range = addr.range();
+
+                    if (range === 'private' || range === 'loopback' || range === 'linkLocal' || range === 'uniqueLocal') {
+                        return NextResponse.json({ error: `Access disallowed: Resolved to private IP (${address})` }, { status: 403 });
+                    }
                 }
-            } catch {
-                return NextResponse.json(
-                    { error: 'Invalid URL format. Please enter a valid URL like https://example.com' },
-                    { status: 400 }
-                );
+            } catch (e) {
+                return NextResponse.json({ error: 'Failed to resolve domain' }, { status: 400 });
             }
 
             console.log(`Detecting sections for URL: ${url}`);

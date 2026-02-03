@@ -6,17 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "playwright install chromium"
   },
   "dependencies": {
     "@anthropic-ai/bedrock-sdk": "^0.26.2",
     "@anthropic-ai/sdk": "^0.72.1",
     "@codesandbox/sandpack-react": "^2.20.0",
     "@codesandbox/sandpack-themes": "^2.0.21",
+    "@google/generative-ai": "^0.24.1",
     "@stackblitz/sdk": "^1.11.0",
     "cheerio": "^1.2.0",
     "clsx": "^2.1.1",
     "file-saver": "^2.0.5",
+    "ipaddr.js": "^2.3.0",
     "jszip": "^3.10.1",
     "lucide-react": "^0.563.0",
     "lz-string": "^1.5.0",

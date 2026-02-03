@@ -34,9 +34,9 @@ export function getSandboxDefaults() {
 export function getDeploymentDependencies() {
     return {
         dependencies: {
-            // Core React 19
-            "react": "^19.0.0",
-            "react-dom": "^19.0.0",
+            // Core React 18
+            "react": "^18.2.0",
+            "react-dom": "^18.2.0",
 
             // UI Libraries (matching workspace)
             "lucide-react": "latest",
@@ -45,8 +45,8 @@ export function getDeploymentDependencies() {
             "framer-motion": "latest",
         },
         devDependencies: {
-            "@types/react": "^19.0.0",
-            "@types/react-dom": "^19.0.0",
+            "@types/react": "^18.2.0",
+            "@types/react-dom": "^18.2.0",
             "typescript": "^5.0.0",
 
             // Build Tool (Vite)

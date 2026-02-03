@@ -4,8 +4,8 @@ The goal is **not** pixel-perfect cloning, but a **close visual approximation** 
 
 **⚠️ CRITICAL: SANDBOX ENVIRONMENT RESTRICTIONS ⚠️**
 The generated code runs in an isolated React sandbox with ONLY these dependencies:
-- React 19 (import React from 'react')
-- Tailwind CSS v4 (utility classes only)
+- React 18 (import React from 'react')
+- Tailwind CSS v3 (utility classes only)
 - Lucide React (import { IconName } from 'lucide-react')
 
 **🚫 ABSOLUTELY FORBIDDEN IMPORTS (Will cause runtime errors):**
@@ -100,8 +100,8 @@ export default function ProductGrid() {
    - **Colors**: Prefer Tailwind’s color scale (\`bg-slate-900\`, \`bg-zinc-800\`, etc.). Only use arbitrary values (\`bg-[#020617]\`) when clearly needed to capture the design.
 
 **Tech Stack:**
-- **React 19**
-- **Tailwind CSS v4** (Standard utility classes only).
+- **React 18**
+- **Tailwind CSS v3** (Standard utility classes only).
 - **Lucide React** (Use **named imports** e.g., \`import { Menu } from 'lucide-react'\`. DO NOT use default imports).
 
 **Output Strategy:**
@@ -118,16 +118,16 @@ export default function ProductGrid() {
 `;
 
 export interface ImagePlaceholderForPrompt {
-    src: string;
-    alt?: string;
-    width?: number;
-    height?: number;
+  src: string;
+  alt?: string;
+  width?: number;
+  height?: number;
 }
 
 export const generateUserPrompt = (
-    type: string,
-    htmlContext?: string,
-    images?: ImagePlaceholderForPrompt[]
+  type: string,
+  htmlContext?: string,
+  images?: ImagePlaceholderForPrompt[]
 ) => `
 **GOAL: VISUAL REPLICA**
 Recreate this '${type}' section as a React component. 

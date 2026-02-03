@@ -1,12 +1,9 @@
-import OpenAI from 'openai';
-import Anthropic from '@anthropic-ai/sdk';
-import { AnthropicBedrock } from '@anthropic-ai/bedrock-sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseGeneratedCode } from './parser';
 
 export interface RefineRequest {
     currentCode: string;
     instruction: string;
-    model?: 'claude' | 'openai';
 }
 
 const SYSTEM_PROMPT_REFINE = `
@@ -21,62 +18,34 @@ Your task is to MODIFY the provided component based on the user's instruction.
 `;
 
 export async function refineComponent(request: RefineRequest): Promise<string> {
-    const { currentCode, instruction, model = 'claude' } = request;
+    const { currentCode, instruction } = request;
 
-    if ((process.env.ANTHROPIC_API_KEY || process.env.AWS_ACCESS_KEY_ID) && model === 'claude') {
-        let anthropic: any;
+    if (!process.env.GEMINI_API_KEY) {
+        throw new Error("GEMINI_API_KEY is missing. Please add it to your .env.local file.");
+    }
 
-        const apiKey = process.env.ANTHROPIC_API_KEY || '';
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    // Using Gemini 2.5 Flash on API v1 as requested
+    const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }, { apiVersion: 'v1' });
 
-        if (apiKey.startsWith('ABSK')) {
-            try {
-                const decoded = Buffer.from(apiKey.substring(4), 'base64').toString();
-                const [accessKey, secretKey] = decoded.split(':');
+    const prompt = `${SYSTEM_PROMPT_REFINE}\n\nCurrent Code:\n${currentCode}\n\nInstruction: ${instruction}`;
 
-                anthropic = new AnthropicBedrock({
-                    awsAccessKey: accessKey,
-                    awsSecretKey: secretKey,
-                    awsRegion: process.env.AWS_REGION || 'us-east-1',
-                });
-            } catch (e) {
-                console.error("Failed to decode custom Bedrock key", e);
-                throw new Error("Invalid custom Bedrock key format");
-            }
-        } else if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
-            anthropic = new AnthropicBedrock({
-                awsAccessKey: process.env.AWS_ACCESS_KEY_ID,
-                awsSecretKey: process.env.AWS_SECRET_ACCESS_KEY,
-                awsRegion: process.env.AWS_REGION || 'us-east-1',
-            });
-        } else {
-            anthropic = new Anthropic({
-                apiKey: apiKey,
-                baseURL: process.env.ANTHROPIC_BASE_URL
-            });
-        }
-        const isBedrock = apiKey.startsWith('ABSK') || !!process.env.AWS_ACCESS_KEY_ID;
-        const modelId = isBedrock ? 'us.anthropic.claude-opus-4-5-20251101-v1:0' : 'claude-opus-4-5-20251101';
-
-        const msg = await anthropic.messages.create({
-            model: modelId,
-            max_tokens: 4096,
-            system: SYSTEM_PROMPT_REFINE,
-            messages: [
-                { role: 'user', content: `Current Code:\n${currentCode}\n\nInstruction: ${instruction}` }
-            ]
-        });
-        const text = msg.content[0].type === 'text' ? msg.content[0].text : '';
+    try {
+        const result = await geminiModel.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
         return parseGeneratedCode(text);
-    } else {
-        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o',
-            messages: [
-                { role: 'system', content: SYSTEM_PROMPT_REFINE },
-                { role: 'user', content: `Current Code:\n${currentCode}\n\nInstruction: ${instruction}` }
-            ],
-            max_tokens: 4000
-        });
-        return parseGeneratedCode(response.choices[0].message.content || '');
+    } catch (e) {
+        console.error("Gemini Refinement Error", e);
+        // Fallback to stable model if preview fails
+        try {
+            console.log("Falling back to gemini-1.5-pro-latest");
+            const fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro-latest" });
+            const result = await fallbackModel.generateContent(prompt);
+            const response = await result.response;
+            return parseGeneratedCode(response.text());
+        } catch (fallbackError) {
+            throw new Error("Failed to refine component with Gemini.");
+        }
     }
 }

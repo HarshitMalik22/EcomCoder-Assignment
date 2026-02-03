@@ -16,7 +16,8 @@ export interface SectionImagePlaceholder {
 }
 
 export interface GenerationRequest {
-    model?: 'claude' | 'openai';
+    // model?: 'claude' | 'openai' | 'gemini'; // Deprecated: Always uses Gemini
+
     sectionData: {
         id: string;
         type: string;

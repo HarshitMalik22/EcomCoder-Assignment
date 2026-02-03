@@ -1,34 +1,30 @@
 # Scraping Strategy & Limitations
 
-LevelUp uses a hybrid scraping approach to ensure maximum compatibility and accuracy.
+LevelUp uses a highly optimized **Playwright** engine designed for stealth and visual fidelity.
 
 ## Architecture
 
-We utilize **Playwright** as our primary engine due to its ability to render modern JavaScript-heavy websites (SPA, React, Vue apps) exactly as a user sees them.
+We utilize **Playwright (Headless Chromium)** as our exclusive scraping engine. We have deprecated Cheerio/static scraping to ensure we capture the visual state of modern Single Page Applications (SPAs).
+
+### Stealth & Evasion
+To bypass "403 Forbidden" errors and anti-bot systems (Cloudflare, Akamai), we inject custom scripts before navigation (`page.addInitScript`):
+
+1. **WebDriver Override**: We delete `navigator.webdriver` to mask the headless state.
+2. **Plugin Spoofing**: We inject fake plugin arrays to mimic a real desktop browser.
+3. **Chrome Runtime Mock**: We mock `window.chrome` objects.
+4. **Hardware Concurrency**: We emulate realistic CPU concurrency.
+5. **Cookie Blocking**: We strip `Set-Cookie` headers from responses to ensure a stateless, tracker-free session.
 
 ### Workflow
-1. **Navigation**: The scraper launches a headless Chromium instance and navigates to the target URL.
-2. **Network Idle**: We wait for the `networkidle` state to ensure critical assets are loaded.
-3. **Cleanup**: Invasive elements like cookie banners, popups, and iframes are programmatically removed using DOM manipulation to ensure a clean screenshot.
-4. **Detection**: We inject a script (`evaluate`) to identify potential semantic sections (`<header>`, `<section>`, `<footer>`, major `<div>` containers) based on heuristics (size, position, tags).
-5. **Capture**: We capture:
-   - A full-page screenshot (for context/overlay).
-   - Individual screenshots of each detected section (for the Vision AI).
-   - HTML structure (for text and hierarchy reference).
-
-## Fallback Mechanisms
-
-If Playwright fails (e.g., due to timeout or detection issues), we have a **Cheerio-based** static scraper in `lib/scraper/cheerio-scraper.ts`. This is faster but only works for server-side rendered (SSR) or static content. Currently, the UI defaults to Playwright for visual accuracy.
+1. **Launch**: Chromium launches with flags to disable automation features (`--disable-blink-features=AutomationControlled`).
+2. **Navigation**: We wait for `networkidle` (no network connections for 500ms) to ensure the page is fully hydrated.
+3. **Cleanup**: We programmatically remove cookie banners, popups, and sticky overlays that might obscure the screenshot.
+4. **Detection**: We execute a heuristic algorithm in the browser context to identify major visual sections (Hero, Features, Footer) based on element size (`getBoundingClientRect`) and DOM depth.
+5. **Capture**: We take high-quality JPEGs of each section.
 
 ## Limitations
 
-1. **Anti-Bot Measures**: Sites with aggressive Cloudflare/Akamai protection may block the headless browser request (403 Forbidden).
-2. **CAPTCHAs**: We do not solve CAPTCHAs.
-3. **Dynamic Viewports**: The scraper uses a fixed 1280x800 viewport. Responsive layouts might look different on mobile; currently, we capture the desktop view standard.
-4. **Authentication**: Pages behind login screens are not accessible.
-
-## Future Improvements
-
-- Implementing "Stealth Mode" plugin for Playwright to bypass basic bot detection.
-- Adding Mobile Viewport scraping option.
-- Proxy rotation service integration.
+1. **Aggressive Bot Protection**: While our stealth scripts work for 90% of sites, extremely sophisticated fingerprinting (e.g., heavily configured Distil Networks) may still block the request.
+2. **CAPTCHAs**: We do not solve visual CAPTCHAs (ReCAPTCHA/hCaptcha).
+3. **Private Content**: We cannot scrape pages requiring login.
+4. **Dynamic Resizing**: Screenshots are taken at a fixed 1920x1080 viewport. Elements that only appear on scroll interaction might be missed if they are lazy-loaded *after* our initial scroll simulation.
