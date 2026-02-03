@@ -1,5 +1,9 @@
 # Website2Code - AI-Powered Web Component Generator
 
+![Landing Page](./public/screenshots/landing.png)
+![App Preview](./public/screenshots/app_preview.png)
+
+
 > **Turn any website section into clean, editable React code instantly.**  
 > Built with Next.js, Playwright, and Google Gemini 2.5 Flash.
 
