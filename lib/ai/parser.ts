@@ -180,7 +180,7 @@ function detectUndefinedComponents(code: string): string[] {
     const builtInComponents = new Set(['Fragment', 'Suspense', 'StrictMode', 'Profiler']);
 
     // Find all PascalCase JSX tags
-    const jsxTagRegex = /<([A-Z][a-zA-Z0-9]*)\s/g;
+    const jsxTagRegex = /<([A-Z][a-zA-Z0-9]*)(?:\s|>|\/)/g;
     let match;
 
     // Get the function body to check for locally defined components

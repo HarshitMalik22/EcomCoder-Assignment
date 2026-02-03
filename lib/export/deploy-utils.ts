@@ -16,6 +16,7 @@ function generateProjectFiles(component: GeneratedComponent) {
         type: "module",
         scripts: {
             "dev": "vite",
+            "start": "vite",
             "build": "tsc && vite build",
             "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
             "preview": "vite preview"
@@ -44,6 +45,10 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    host: true,
+    port: 5173
+  }
 })`;
 
     // index.html (Root level for Vite)
@@ -128,6 +133,26 @@ body {
   },
 }`;
 
+    // .codesandbox/tasks.json
+    const tasksJson = {
+        "setupTasks": [
+            {
+                "name": "Install dependencies",
+                "command": "npm install"
+            }
+        ],
+        "tasks": {
+            "dev": {
+                "name": "dev",
+                "command": "npm run dev",
+                "runAtStart": true,
+                "preview": {
+                    "port": 5173
+                }
+            }
+        }
+    };
+
     return {
         "package.json": JSON.stringify(packageJson, null, 2),
         "vite.config.ts": viteConfig,
@@ -138,7 +163,8 @@ body {
         "src/index.css": indexCss,
         "src/App.tsx": appTsx,
         "tsconfig.json": JSON.stringify(tsConfig, null, 2),
-        "tsconfig.node.json": JSON.stringify(tsConfigNode, null, 2)
+        "tsconfig.node.json": JSON.stringify(tsConfigNode, null, 2),
+        ".codesandbox/tasks.json": JSON.stringify(tasksJson, null, 2)
     };
 }
 
@@ -165,8 +191,10 @@ export async function deployToCodeSandbox(component: GeneratedComponent, toast: 
                 "src/index.css": { content: files["src/index.css"] },
                 "src/App.tsx": { content: files["src/App.tsx"] },
                 "tsconfig.json": { content: files["tsconfig.json"] },
-                "tsconfig.node.json": { content: files["tsconfig.node.json"] }
-            }
+                "tsconfig.node.json": { content: files["tsconfig.node.json"] },
+                ".codesandbox/tasks.json": { content: files[".codesandbox/tasks.json"] }
+            },
+            template: "node"
         };
 
         const compressedParameters = compressParameters(parameters);
