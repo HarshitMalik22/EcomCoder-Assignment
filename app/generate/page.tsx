@@ -12,6 +12,7 @@ import CopyButton from '@/components/CopyButton';
 import { useToast } from '@/components/ui/Toast';
 import { SectionMetadata } from '@/types/section';
 import { GeneratedComponent } from '@/types/generated-component';
+import { DeployButtons } from '@/components/DeployButtons';
 import { generateDownload } from '@/lib/export/file-generator';
 
 function GeneratePageContent() {
@@ -254,14 +255,14 @@ function GeneratePageContent() {
     };
 
     if (!url) {
-                return (
-                    <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
-                        <p className="text-zinc-500">No URL provided. Go back and enter a URL.</p>
-                    </div>
-                );
-            }
+        return (
+            <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+                <p className="text-zinc-500">No URL provided. Go back and enter a URL.</p>
+            </div>
+        );
+    }
 
-            const activeComponent = generatedComponents.find(c => c.id === activeComponentId);
+    const activeComponent = generatedComponents.find(c => c.id === activeComponentId);
 
     return (
         <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4 md:p-6 overflow-hidden max-h-screen flex flex-col" suppressHydrationWarning>
@@ -373,6 +374,7 @@ function GeneratePageContent() {
                                             >
                                                 <Download className="w-4 h-4" />
                                             </button>
+                                            <DeployButtons component={activeComponent} />
                                         </div>
                                         <div className="flex-1 overflow-auto">
                                             <CodeDisplay

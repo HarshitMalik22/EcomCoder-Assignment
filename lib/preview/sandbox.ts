@@ -30,3 +30,33 @@ export const SANDBOX_CONFIG = {
 export function getSandboxDefaults() {
     return SANDBOX_CONFIG;
 }
+
+export function getDeploymentDependencies() {
+    return {
+        dependencies: {
+            // Core React 19
+            "react": "^19.0.0",
+            "react-dom": "^19.0.0",
+
+            // UI Libraries (matching workspace)
+            "lucide-react": "latest",
+            "clsx": "latest",
+            "tailwind-merge": "latest",
+            "framer-motion": "latest",
+        },
+        devDependencies: {
+            "@types/react": "^19.0.0",
+            "@types/react-dom": "^19.0.0",
+            "typescript": "^5.0.0",
+
+            // Build Tool (Vite)
+            "vite": "^5.0.0",
+            "@vitejs/plugin-react": "^4.2.0",
+
+            // Tailwind CSS
+            "tailwindcss": "^3.4.0",
+            "autoprefixer": "^10.4.14",
+            "postcss": "^8.4.31"
+        }
+    };
+}
