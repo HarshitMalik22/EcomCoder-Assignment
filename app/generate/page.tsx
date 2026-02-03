@@ -15,6 +15,7 @@ import { GeneratedComponent } from '@/types/generated-component';
 import { DeployButtons } from '@/components/DeployButtons';
 import { generateDownload } from '@/lib/export/file-generator';
 import ScrapeErrorModal from '@/components/ScrapeErrorModal';
+import InteractiveLoader from '@/components/InteractiveLoader';
 
 function GeneratePageContent() {
     const searchParams = useSearchParams();
@@ -335,11 +336,7 @@ function GeneratePageContent() {
 
                 {/* STATE: DETECTING */}
                 {step === 'detecting' && (
-                    <div className="flex flex-col items-center justify-center h-full">
-                        <Loader2 className="w-12 h-12 text-amber-500 animate-spin mb-4" />
-                        <h2 className="text-xl font-semibold">Scanning page…</h2>
-                        <p className="text-zinc-500 text-sm mt-1">Detecting sections and capturing screenshots.</p>
-                    </div>
+                    <InteractiveLoader type="scanning" />
                 )}
 
                 {/* STATE: SELECTING */}
@@ -355,11 +352,7 @@ function GeneratePageContent() {
 
                 {/* STATE: GENERATING */}
                 {step === 'generating' && (
-                    <div className="flex flex-col items-center justify-center h-full">
-                        <Loader2 className="w-16 h-16 text-amber-500 animate-spin mb-6" />
-                        <h2 className="text-xl font-semibold mt-6">Generating components…</h2>
-                        <p className="text-zinc-500 text-sm mt-1">Writing React and Tailwind.</p>
-                    </div>
+                    <InteractiveLoader type="generating" />
                 )}
 
                 {/* STATE: PREVIEW */}
@@ -541,7 +534,12 @@ function GeneratePageContent() {
 
 export default function GeneratePage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-zinc-950 flex items-center justify-center text-zinc-400">Loading...</div>}>
+        <Suspense fallback={
+            <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center gap-4">
+                <div className="w-12 h-12 rounded-full border-2 border-amber-500/20 border-t-amber-500 animate-spin" />
+                <div className="text-zinc-500 text-sm font-medium animate-pulse">Initializing Interface...</div>
+            </div>
+        }>
             <GeneratePageContent />
         </Suspense>
     );
