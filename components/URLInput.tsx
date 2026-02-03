@@ -71,6 +71,22 @@ export default function URLInput() {
             <p className="text-center text-xs text-zinc-500">
                 Paste a page URL to detect sections and generate components.
             </p>
+            <div className="flex justify-center items-center gap-3 text-xs text-zinc-500">
+                <span>Try examples:</span>
+                <button
+                    onClick={() => setUrl('https://ecomcoder.com')}
+                    className="text-zinc-400 hover:text-amber-400 transition-colors hover:underline"
+                >
+                    ecomcoder.com
+                </button>
+                <span>|</span>
+                <button
+                    onClick={() => setUrl('https://www.udemy.com')}
+                    className="text-zinc-400 hover:text-amber-400 transition-colors hover:underline"
+                >
+                    udemy.com
+                </button>
+            </div>
         </div>
     );
 }
